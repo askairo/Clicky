@@ -25,20 +25,32 @@ type HookResult = {
 
 type ApplyResult = {
   environment: string;
-  mode: "session" | "persistent";
+  mode: "persistent";
   variable_results: VariableApplyResult[];
   hook_results: HookResult[];
 };
 
+const SENSITIVE_KEY_PATTERN = /(pass|password|pwd|token|secret|key|credential|auth)/i;
+
+function isSensitiveKey(key: string) {
+  return SENSITIVE_KEY_PATTERN.test(key);
+}
+
+function displayValue(key: string, value?: string, reveal = false) {
+  if (value === undefined) return "（未设置）";
+  if (!isSensitiveKey(key) || reveal) return value;
+  return value.length === 0 ? "（空值）" : "••••••••";
+}
+
 function App() {
   const [envs, setEnvs] = useState<EnvSummary[]>([]);
   const [selected, setSelected] = useState<string>("");
-  const [mode, setMode] = useState<"session" | "persistent">("session");
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [activeEnvs, setActiveEnvs] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
+  const [revealSensitive, setRevealSensitive] = useState(false);
 
   const refreshActiveEnvs = async () => {
     const names = await invoke<string[]>("detect_active_environments");
@@ -74,11 +86,11 @@ function App() {
     setBusy(true);
     setStatus("");
     try {
-      const result = await invoke<ApplyResult>("apply_environment", { envName: selected, mode });
+      const result = await invoke<ApplyResult>("apply_environment", { envName: selected, mode: "persistent" });
       setApplyResult(result);
       await refreshActiveEnvs();
       const okCount = result.variable_results.filter((x) => x.applied).length;
-      setStatus(`已应用 ${result.environment}（${result.mode}），成功 ${okCount}/${result.variable_results.length} 个变量。`);
+      setStatus(`已应用 ${result.environment}，成功 ${okCount}/${result.variable_results.length} 个变量。请重新打开终端、IDE 或目标应用以读取最新环境变量。`);
     } catch (e) {
       setStatus(`应用失败：${e}`);
       setApplyResult(null);
@@ -90,7 +102,7 @@ function App() {
   return (
     <main className="container">
       <h1>envflow</h1>
-      <p className="subtitle">一键切换环境变量（Windows MVP）</p>
+      <p className="subtitle">一键切换用户级环境变量（Windows MVP，新进程生效）</p>
 
       <section className="panel indicator">
         <strong>当前激活环境：</strong>
@@ -110,11 +122,7 @@ function App() {
           ))}
         </select>
 
-        <label htmlFor="modeSelect">应用模式</label>
-        <select id="modeSelect" value={mode} onChange={(e) => setMode(e.target.value as "session" | "persistent")}>
-          <option value="session">session（当前进程）</option>
-          <option value="persistent">persistent（新进程生效）</option>
-        </select>
+        <p className="notice">应用后会写入 Windows 用户级环境变量；已经打开的终端、IDE 和业务进程通常需要重启后才会读取新值。</p>
 
         <button onClick={onApply} disabled={!selected || busy}>
           {busy ? "应用中..." : "应用环境"}
@@ -122,7 +130,17 @@ function App() {
       </section>
 
       <section className="panel">
-        <h2>变量预览</h2>
+        <div className="section-title">
+          <h2>变量预览</h2>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={revealSensitive}
+              onChange={(e) => setRevealSensitive(e.target.checked)}
+            />
+            显示敏感值
+          </label>
+        </div>
         <table>
           <thead>
             <tr>
@@ -134,7 +152,7 @@ function App() {
             {entries.map(([k, v]) => (
               <tr key={k}>
                 <td>{k}</td>
-                <td>{v}</td>
+                <td>{displayValue(k, v, revealSensitive)}</td>
               </tr>
             ))}
           </tbody>
@@ -158,8 +176,8 @@ function App() {
               {applyResult.variable_results.map((r) => (
                 <tr key={r.key}>
                   <td>{r.key}</td>
-                  <td>{r.before ?? "（未设置）"}</td>
-                  <td>{r.after}</td>
+                  <td>{displayValue(r.key, r.before, revealSensitive)}</td>
+                  <td>{displayValue(r.key, r.after, revealSensitive)}</td>
                   <td>{r.applied ? "成功" : "失败"}</td>
                   <td>{r.message}</td>
                 </tr>

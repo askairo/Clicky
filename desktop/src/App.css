@@ -27,7 +27,7 @@ h1 {
 .panel {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 14px;
   margin-top: 14px;
 }
@@ -42,6 +42,13 @@ label {
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+.notice {
+  margin: 10px 0 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 select,
@@ -63,6 +70,32 @@ button {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-title h2 {
+  margin: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle input {
+  margin: 0;
 }
 
 table {

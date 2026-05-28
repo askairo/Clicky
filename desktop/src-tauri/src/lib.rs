@@ -130,10 +130,6 @@ fn detect_active_environments() -> Result<Vec<String>, String> {
     Ok(matches)
 }
 
-fn apply_var_session(key: &str, value: &str) {
-    std::env::set_var(key, value);
-}
-
 #[cfg(target_os = "windows")]
 fn apply_var_persistent_windows(key: &str, value: &str) -> Result<(), String> {
     let status = Command::new("setx")
@@ -205,10 +201,9 @@ fn apply_environment(env_name: String, mode: String) -> Result<ApplyResult, Stri
         .get(&env_name)
         .ok_or_else(|| format!("environment '{}' not found", env_name))?;
 
-    let normalized_mode = match mode.as_str() {
-        "session" | "persistent" => mode.clone(),
-        _ => return Err("mode must be 'session' or 'persistent'".to_string()),
-    };
+    if mode != "persistent" {
+        return Err("envflow only supports persistent mode; reopen target processes after applying".to_string());
+    }
 
     let mut variable_results = Vec::new();
 
@@ -217,32 +212,21 @@ fn apply_environment(env_name: String, mode: String) -> Result<ApplyResult, Stri
 
     for (k, v) in entries {
         let before = std::env::var(k).ok();
-        let result = if normalized_mode == "session" {
-            apply_var_session(k, v);
-            VariableApplyResult {
+        let result = match apply_var_persistent_windows(k, v) {
+            Ok(_) => VariableApplyResult {
                 key: k.clone(),
                 before,
                 after: v.clone(),
                 applied: true,
-                message: "applied to current process".to_string(),
-            }
-        } else {
-            match apply_var_persistent_windows(k, v) {
-                Ok(_) => VariableApplyResult {
-                    key: k.clone(),
-                    before,
-                    after: v.clone(),
-                    applied: true,
-                    message: "persisted for new processes".to_string(),
-                },
-                Err(e) => VariableApplyResult {
-                    key: k.clone(),
-                    before,
-                    after: v.clone(),
-                    applied: false,
-                    message: e,
-                },
-            }
+                message: "persisted for new processes".to_string(),
+            },
+            Err(e) => VariableApplyResult {
+                key: k.clone(),
+                before,
+                after: v.clone(),
+                applied: false,
+                message: e,
+            },
         };
         variable_results.push(result);
     }
@@ -251,7 +235,7 @@ fn apply_environment(env_name: String, mode: String) -> Result<ApplyResult, Stri
 
     Ok(ApplyResult {
         environment: env_name,
-        mode: normalized_mode,
+        mode,
         variable_results,
         hook_results,
     })

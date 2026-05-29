@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import envflowLogo from "./assets/envflow-logo.png";
 import "./App.css";
 
 type EnvSummary = {
@@ -101,8 +102,13 @@ function App() {
 
   return (
     <main className="container">
-      <h1>envflow</h1>
-      <p className="subtitle">一键切换用户级环境变量（Windows MVP，新进程生效）</p>
+      <header className="app-header">
+        <img className="app-logo" src={envflowLogo} alt="" aria-hidden="true" />
+        <div>
+          <h1>envflow</h1>
+          <p className="subtitle">一键切换用户级环境变量（Windows MVP，新进程生效）</p>
+        </div>
+      </header>
 
       <section className="panel indicator">
         <strong>当前激活环境：</strong>

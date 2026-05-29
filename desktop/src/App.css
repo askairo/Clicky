@@ -19,6 +19,18 @@ h1 {
   font-size: 28px;
 }
 
+.app-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.app-logo {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+}
+
 .subtitle {
   margin-top: 8px;
   color: #4b5563;

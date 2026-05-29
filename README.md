@@ -6,7 +6,7 @@ Desktop tool inspired by SwitchHosts for switching environment variables (not on
 
 - Windows first
 - Tauri + React desktop app
-- Environment config from `desktop/config/environments.yaml`
+- Environment config from `config/environments.yaml`
 - One-click apply writes user-level variables via `setx`
 - Sensitive values are masked in the UI by default
 - Post-apply hooks can run commands after switching
@@ -14,14 +14,13 @@ Desktop tool inspired by SwitchHosts for switching environment variables (not on
 ## Run (Windows)
 
 ```powershell
-cd desktop
 npm install
 npm run tauri dev
 ```
 
 ## Config file
 
-`desktop/config/environments.yaml`
+`config/environments.yaml`
 
 Example:
 

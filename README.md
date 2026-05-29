@@ -1,4 +1,4 @@
-# envflow
+# Clicky
 
 Desktop tool inspired by SwitchHosts for switching environment variables (not only hosts).
 
@@ -32,7 +32,7 @@ environments:
       ZNDER_MYSQL_HOST: "192.168.60.176"
     hooks:
       post:
-        - "echo envflow switched to dev"
+        - "echo Clicky switched to dev"
   sit:
     variables:
       ZNDER_MYSQL_HOST: "120.76.142.193"

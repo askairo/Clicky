@@ -1,6 +1,6 @@
-# Tauri + React + Typescript
+# Clicky Desktop
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Clicky is a Tauri + React desktop app for one-click switching of local development environments.
 
 ## Recommended IDE Setup
 

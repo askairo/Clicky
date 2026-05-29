@@ -9,7 +9,7 @@ environments:
       ZNDER_MYSQL_PASS: "zender"
     hooks:
       post:
-        - "echo envflow switched to dev"
+        - "echo Clicky switched to dev"
 
   sit:
     description: SIT connection values
@@ -21,4 +21,4 @@ environments:
       ZNDER_MYSQL_PASS: "zender@dev"
     hooks:
       post:
-        - "echo envflow switched to sit"
+        - "echo Clicky switched to sit"

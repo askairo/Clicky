@@ -1,12 +1,12 @@
 [package]
-name = "desktop"
+name = "clicky"
 version = "0.1.0"
-description = "Switch Env Desktop"
+description = "Clicky desktop environment switcher"
 authors = ["askairo"]
 edition = "2021"
 
 [lib]
-name = "desktop_lib"
+name = "clicky_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

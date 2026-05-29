@@ -362,7 +362,7 @@ fn apply_environment(group_name: String, env_name: String, mode: String) -> Resu
         .ok_or_else(|| format!("environment '{}' not found in group '{}'", env_name, group_name))?;
 
     if mode != "persistent" {
-        return Err("envflow only supports persistent mode; reopen target processes after applying".to_string());
+        return Err("Clicky only supports persistent mode; reopen target processes after applying".to_string());
     }
 
     let mut variable_results = Vec::new();

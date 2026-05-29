@@ -1,28 +1,47 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct ConfigFile {
+    #[serde(default)]
+    groups: HashMap<String, GroupDef>,
+    #[serde(default)]
     environments: HashMap<String, EnvDef>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct GroupDef {
+    description: Option<String>,
+    #[serde(default)]
+    environments: HashMap<String, EnvDef>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct EnvDef {
     description: Option<String>,
+    #[serde(default)]
     variables: HashMap<String, String>,
     hooks: Option<HooksDef>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct HooksDef {
     post: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
+struct GroupSummary {
+    name: String,
+    description: Option<String>,
+    env_count: usize,
+}
+
+#[derive(Debug, Serialize)]
 struct EnvSummary {
+    group: String,
     name: String,
     description: Option<String>,
     var_count: usize,
@@ -47,6 +66,7 @@ struct HookResult {
 
 #[derive(Debug, Serialize)]
 struct ApplyResult {
+    group: String,
     environment: String,
     mode: String,
     variable_results: Vec<VariableApplyResult>,
@@ -77,23 +97,117 @@ fn config_path() -> Result<PathBuf, String> {
     ))
 }
 
+fn normalize_config(mut cfg: ConfigFile) -> ConfigFile {
+    if !cfg.environments.is_empty() {
+        let mut default_group = cfg.groups.remove("default").unwrap_or(GroupDef {
+            description: Some("Default group".to_string()),
+            environments: HashMap::new(),
+        });
+        for (name, env) in cfg.environments.drain() {
+            default_group.environments.insert(name, env);
+        }
+        cfg.groups.insert("default".to_string(), default_group);
+    }
+    cfg
+}
+
 fn load_config() -> Result<ConfigFile, String> {
     let path = config_path()?;
     let content = fs::read_to_string(&path)
         .map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
-    serde_yaml::from_str::<ConfigFile>(&content)
-        .map_err(|e| format!("failed to parse {}: {}", path.display(), e))
+    let cfg = serde_yaml::from_str::<ConfigFile>(&content)
+        .map_err(|e| format!("failed to parse {}: {}", path.display(), e))?;
+    Ok(normalize_config(cfg))
+}
+
+fn save_config(cfg: &ConfigFile) -> Result<(), String> {
+    let path = config_path()?;
+    let content = serde_yaml::to_string(cfg)
+        .map_err(|e| format!("failed to serialize config: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("failed to write {}: {}", path.display(), e))
+}
+
+fn validate_group_variable_uniqueness(cfg: &ConfigFile) -> Result<(), String> {
+    let mut key_to_group: HashMap<String, String> = HashMap::new();
+
+    for (group_name, group) in &cfg.groups {
+        let mut group_keys: HashSet<String> = HashSet::new();
+        for env in group.environments.values() {
+            for key in env.variables.keys() {
+                group_keys.insert(key.clone());
+            }
+        }
+
+        for key in group_keys {
+            if let Some(existing_group) = key_to_group.get(&key) {
+                if existing_group != group_name {
+                    return Err(format!(
+                        "variable '{}' is already used in group '{}', cannot reuse in group '{}'",
+                        key, existing_group, group_name
+                    ));
+                }
+            } else {
+                key_to_group.insert(key, group_name.clone());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
-fn list_environments() -> Result<Vec<EnvSummary>, String> {
+fn list_groups() -> Result<Vec<GroupSummary>, String> {
     let cfg = load_config()?;
     let mut list = cfg
-        .environments
+        .groups
         .into_iter()
-        .map(|(name, env)| EnvSummary {
+        .map(|(name, group)| GroupSummary {
+            env_count: group.environments.len(),
             name,
-            description: env.description,
+            description: group.description,
+        })
+        .collect::<Vec<_>>();
+    list.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(list)
+}
+
+#[tauri::command]
+fn create_group(group_name: String) -> Result<(), String> {
+    let mut cfg = load_config()?;
+    let name = group_name.trim();
+    if name.is_empty() {
+        return Err("group name is required".to_string());
+    }
+    if cfg.groups.contains_key(name) {
+        return Err(format!("group '{}' already exists", name));
+    }
+
+    cfg.groups.insert(
+        name.to_string(),
+        GroupDef {
+            description: Some(format!("{} group", name)),
+            environments: HashMap::new(),
+        },
+    );
+
+    save_config(&cfg)
+}
+
+#[tauri::command]
+fn list_environments(group_name: String) -> Result<Vec<EnvSummary>, String> {
+    let cfg = load_config()?;
+    let group = cfg
+        .groups
+        .get(&group_name)
+        .ok_or_else(|| format!("group '{}' not found", group_name))?;
+
+    let mut list = group
+        .environments
+        .iter()
+        .map(|(name, env)| EnvSummary {
+            group: group_name.clone(),
+            name: name.clone(),
+            description: env.description.clone(),
             var_count: env.variables.len(),
         })
         .collect::<Vec<_>>();
@@ -102,32 +216,74 @@ fn list_environments() -> Result<Vec<EnvSummary>, String> {
 }
 
 #[tauri::command]
-fn get_environment_variables(env_name: String) -> Result<HashMap<String, String>, String> {
+fn get_environment_variables(group_name: String, env_name: String) -> Result<HashMap<String, String>, String> {
     let cfg = load_config()?;
-    cfg.environments
+    let group = cfg
+        .groups
+        .get(&group_name)
+        .ok_or_else(|| format!("group '{}' not found", group_name))?;
+    group
+        .environments
         .get(&env_name)
         .map(|e| e.variables.clone())
-        .ok_or_else(|| format!("environment '{}' not found", env_name))
+        .ok_or_else(|| format!("environment '{}' not found in group '{}'", env_name, group_name))
 }
 
 #[tauri::command]
-fn detect_active_environments() -> Result<Vec<String>, String> {
+fn detect_active_environments(group_name: String) -> Result<Vec<String>, String> {
     let cfg = load_config()?;
-    let mut matches = Vec::new();
+    let group = cfg
+        .groups
+        .get(&group_name)
+        .ok_or_else(|| format!("group '{}' not found", group_name))?;
 
-    for (env_name, env_def) in cfg.environments {
-        let all_match = env_def.variables.iter().all(|(k, v)| {
-            std::env::var(k)
-                .map(|current| current == *v)
-                .unwrap_or(false)
-        });
+    let mut matches = Vec::new();
+    for (env_name, env_def) in &group.environments {
+        let all_match = env_def
+            .variables
+            .iter()
+            .all(|(k, v)| std::env::var(k).map(|current| current == *v).unwrap_or(false));
         if all_match {
-            matches.push(env_name);
+            matches.push(env_name.clone());
         }
     }
 
     matches.sort();
     Ok(matches)
+}
+
+#[tauri::command]
+fn save_environment_variables(
+    group_name: String,
+    env_name: String,
+    variables: HashMap<String, String>,
+) -> Result<(), String> {
+    let mut cfg = load_config()?;
+
+    let existing_group = cfg
+        .groups
+        .entry(group_name.clone())
+        .or_insert(GroupDef {
+            description: Some(format!("{} group", group_name)),
+            environments: HashMap::new(),
+        });
+
+    let existing_env = existing_group.environments.get(&env_name).cloned();
+    let updated_env = match existing_env {
+        Some(mut env) => {
+            env.variables = variables;
+            env
+        }
+        None => EnvDef {
+            description: Some(format!("{} environment", env_name)),
+            variables,
+            hooks: Some(HooksDef { post: None }),
+        },
+    };
+
+    existing_group.environments.insert(env_name, updated_env);
+    validate_group_variable_uniqueness(&cfg)?;
+    save_config(&cfg)
 }
 
 #[cfg(target_os = "windows")]
@@ -194,19 +350,22 @@ fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
 }
 
 #[tauri::command]
-fn apply_environment(env_name: String, mode: String) -> Result<ApplyResult, String> {
+fn apply_environment(group_name: String, env_name: String, mode: String) -> Result<ApplyResult, String> {
     let cfg = load_config()?;
-    let env = cfg
+    let group = cfg
+        .groups
+        .get(&group_name)
+        .ok_or_else(|| format!("group '{}' not found", group_name))?;
+    let env = group
         .environments
         .get(&env_name)
-        .ok_or_else(|| format!("environment '{}' not found", env_name))?;
+        .ok_or_else(|| format!("environment '{}' not found in group '{}'", env_name, group_name))?;
 
     if mode != "persistent" {
         return Err("envflow only supports persistent mode; reopen target processes after applying".to_string());
     }
 
     let mut variable_results = Vec::new();
-
     let mut entries = env.variables.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
 
@@ -234,6 +393,7 @@ fn apply_environment(env_name: String, mode: String) -> Result<ApplyResult, Stri
     let hook_results = run_post_hooks(env.hooks.as_ref());
 
     Ok(ApplyResult {
+        group: group_name,
         environment: env_name,
         mode,
         variable_results,
@@ -246,9 +406,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            list_groups,
+            create_group,
             list_environments,
             get_environment_variables,
             detect_active_environments,
+            save_environment_variables,
             apply_environment
         ])
         .run(tauri::generate_context!())

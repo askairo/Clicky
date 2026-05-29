@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   CheckCircle2,
   ChevronRight,
   CircleAlert,
+  Edit3,
   Eye,
   EyeOff,
   FolderPlus,
@@ -16,6 +18,7 @@ import {
   Sun,
   Trash2,
   Wand2,
+  X,
 } from "lucide-react";
 import clickyLogo from "./assets/clicky-logo.png";
 import "./App.css";
@@ -57,6 +60,26 @@ type ApplyResult = {
   variable_results: VariableApplyResult[];
   hook_results: HookResult[];
 };
+
+type ExportResult = {
+  output_path: string;
+  groups: number;
+  environments: number;
+  variables: number;
+};
+
+type ImportSummary = {
+  groups_added: number;
+  groups_skipped: number;
+  envs_added: number;
+  envs_skipped: number;
+  vars_added: number;
+  vars_overwritten: number;
+  vars_skipped: number;
+};
+
+type ImportTargetMode = "keep_groups" | "into_group";
+type ImportConflictStrategy = "skip_existing" | "overwrite_existing" | "only_add_new";
 
 type EditableVar = {
   key: string;
@@ -101,6 +124,17 @@ function App() {
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
   const [revealSensitive, setRevealSensitive] = useState(false);
   const [draftVars, setDraftVars] = useState<EditableVar[]>([]);
+  const [ioModalOpen, setIoModalOpen] = useState(false);
+  const [ioTab, setIoTab] = useState<"export" | "import">("export");
+  const [exportScope, setExportScope] = useState<"all" | "selected">("all");
+  const [selectedExportGroups, setSelectedExportGroups] = useState<string[]>([]);
+  const [exportPath, setExportPath] = useState("");
+  const [importPath, setImportPath] = useState("");
+  const [importTargetMode, setImportTargetMode] = useState<ImportTargetMode>("keep_groups");
+  const [importTargetGroup, setImportTargetGroup] = useState("");
+  const [importConflictStrategy, setImportConflictStrategy] =
+    useState<ImportConflictStrategy>("skip_existing");
+  const [importPreview, setImportPreview] = useState<ImportSummary | null>(null);
 
   const refreshGroups = async (preferred?: string) => {
     const list = await invoke<GroupSummary[]>("list_groups");
@@ -303,6 +337,161 @@ function App() {
     }
   };
 
+  const onRenameGroupModal = async () => {
+    if (!selectedGroup) return;
+    const next = window.prompt("请输入新的分组名", selectedGroup)?.trim();
+    if (!next || next === selectedGroup) return;
+    if (groups.some((g) => g.name === next)) {
+      setStatus(`分组 ${next} 已存在。`);
+      return;
+    }
+    try {
+      await invoke("rename_group", { oldName: selectedGroup, newName: next });
+      await refreshGroups(next);
+      setStatus(`分组已重命名：${selectedGroup} -> ${next}`);
+    } catch (e) {
+      setStatus(`重命名分组失败：${e}`);
+    }
+  };
+
+  const onDeleteGroupModal = async () => {
+    if (!selectedGroup) return;
+    const ok = window.confirm(`将删除分组 '${selectedGroup}'，并删除其下所有环境和变量。是否继续？`);
+    if (!ok) return;
+    const typed = window.prompt(`请输入分组名 '${selectedGroup}' 进行二次确认`);
+    if (typed?.trim() !== selectedGroup) {
+      setStatus("二次确认未通过，已取消删除。");
+      return;
+    }
+    try {
+      await invoke("delete_group", { groupName: selectedGroup });
+      await refreshGroups();
+      setStatus(`分组已删除：${selectedGroup}`);
+    } catch (e) {
+      setStatus(`删除分组失败：${e}`);
+    }
+  };
+
+  const onRenameEnvModal = async () => {
+    if (!selectedGroup || !selectedEnv) return;
+    const next = window.prompt("请输入新的环境名", selectedEnv)?.trim();
+    if (!next || next === selectedEnv) return;
+    if (envs.some((e) => e.name === next)) {
+      setStatus(`环境 ${next} 已存在。`);
+      return;
+    }
+    try {
+      await invoke("rename_environment", { groupName: selectedGroup, oldName: selectedEnv, newName: next });
+      await refreshEnvs(selectedGroup, next);
+      setStatus(`环境已重命名：${selectedEnv} -> ${next}`);
+    } catch (e) {
+      setStatus(`重命名环境失败：${e}`);
+    }
+  };
+
+  const onDeleteEnvModal = async () => {
+    if (!selectedGroup || !selectedEnv) return;
+    const ok = window.confirm(`将删除环境 '${selectedEnv}'，并删除该环境下所有变量。是否继续？`);
+    if (!ok) return;
+    const typed = window.prompt(`请输入环境名 '${selectedEnv}' 进行二次确认`);
+    if (typed?.trim() !== selectedEnv) {
+      setStatus("二次确认未通过，已取消删除。");
+      return;
+    }
+    try {
+      await invoke("delete_environment", { groupName: selectedGroup, envName: selectedEnv });
+      await refreshEnvs(selectedGroup);
+      setStatus(`环境已删除：${selectedEnv}`);
+    } catch (e) {
+      setStatus(`删除环境失败：${e}`);
+    }
+  };
+
+  const toggleExportGroup = (name: string) => {
+    setSelectedExportGroups((prev) =>
+      prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name],
+    );
+  };
+
+  const onExportConfig = async () => {
+    const chosen = await save({
+      defaultPath: exportPath.trim() || "clicky-export.yaml",
+      filters: [{ name: "YAML", extensions: ["yaml", "yml"] }],
+    });
+    if (!chosen) return;
+    let path = String(chosen).trim();
+    if (!/\.(ya?ml)$/i.test(path)) path = `${path}.yaml`;
+    setExportPath(path);
+    const groupNames = exportScope === "all" ? [] : selectedExportGroups;
+    if (exportScope === "selected" && groupNames.length === 0) {
+      setStatus("请至少选择一个导出分组。");
+      return;
+    }
+    try {
+      const result = await invoke<ExportResult>("export_config", {
+        req: { output_path: path, group_names: groupNames },
+      });
+      setStatus(`导出完成：${result.groups} 组 / ${result.environments} 环境 / ${result.variables} 变量`);
+    } catch (e) {
+      setStatus(`导出失败：${e}`);
+    }
+  };
+
+  const onPickImportPath = async () => {
+    const chosen = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "YAML", extensions: ["yaml", "yml"] }],
+    });
+    if (!chosen) return;
+    setImportPath(String(chosen));
+  };
+
+  const buildImportReq = () => ({
+    input_path: importPath.trim(),
+    target_mode: importTargetMode,
+    target_group: importTargetMode === "into_group" ? importTargetGroup.trim() : null,
+    conflict_strategy: importConflictStrategy,
+    dry_run: false,
+  });
+
+  const onPreviewImport = async () => {
+    if (!importPath.trim()) {
+      setStatus("请先选择导入文件。");
+      return;
+    }
+    if (importTargetMode === "into_group" && !importTargetGroup.trim()) {
+      setStatus("请选择或输入目标分组。");
+      return;
+    }
+    try {
+      const summary = await invoke<ImportSummary>("preview_import_config", { req: buildImportReq() });
+      setImportPreview(summary);
+      setStatus("导入预览已生成。");
+    } catch (e) {
+      setStatus(`导入预览失败：${e}`);
+    }
+  };
+
+  const onImportConfig = async () => {
+    if (!importPath.trim()) {
+      setStatus("请先选择导入文件。");
+      return;
+    }
+    if (importTargetMode === "into_group" && !importTargetGroup.trim()) {
+      setStatus("请选择或输入目标分组。");
+      return;
+    }
+    try {
+      const summary = await invoke<ImportSummary>("import_config", { req: buildImportReq() });
+      setImportPreview(summary);
+      await refreshGroups(importTargetMode === "into_group" ? importTargetGroup.trim() : undefined);
+      setStatus("导入完成。");
+    } catch (e) {
+      setStatus(`导入失败：${e}`);
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -361,7 +550,15 @@ function App() {
           <section className="sidebar-section">
             <div className="section-heading">
               <span>分组</span>
-              <span>{groups.length}</span>
+              <div className="section-heading-actions">
+                <span>{groups.length}</span>
+                <button className="icon-button" type="button" title="重命名分组" onClick={onRenameGroupModal}>
+                  <Edit3 size={14} />
+                </button>
+                <button className="icon-button danger" type="button" title="删除分组" onClick={onDeleteGroupModal}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
             <div className="item-list">
               {groups.map((group) => (
@@ -395,7 +592,15 @@ function App() {
           <section className="sidebar-section">
             <div className="section-heading">
               <span>环境</span>
-              <span>{envs.length}</span>
+              <div className="section-heading-actions">
+                <span>{envs.length}</span>
+                <button className="icon-button" type="button" title="重命名环境" onClick={onRenameEnvModal}>
+                  <Edit3 size={14} />
+                </button>
+                <button className="icon-button danger" type="button" title="删除环境" onClick={onDeleteEnvModal}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
             <div className="item-list">
               {envs.map((env) => {
@@ -438,6 +643,17 @@ function App() {
               <p>{selectedGroupMeta?.description || selectedEnvMeta?.description || "Windows 用户级环境变量"}</p>
             </div>
             <div className="toolbar">
+              <button
+                className="ghost-action"
+                onClick={() => {
+                  setIoModalOpen(true);
+                  setIoTab("export");
+                }}
+                type="button"
+              >
+                <Settings2 size={16} />
+                导入/导出
+              </button>
               <button
                 className="ghost-action"
                 onClick={() => setRevealSensitive((value) => !value)}
@@ -567,6 +783,127 @@ function App() {
           )}
         </section>
       </div>
+
+      {ioModalOpen && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setIoModalOpen(false)}>
+          <section className="io-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <header className="io-modal-header">
+              <div>
+                <span className="eyebrow">Config I/O</span>
+                <h3>导入 / 导出</h3>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setIoModalOpen(false)} aria-label="关闭">
+                <X size={16} />
+              </button>
+            </header>
+
+            <div className="segment-control" role="tablist" aria-label="导入导出标签">
+              <button className={ioTab === "export" ? "segment active" : "segment"} type="button" onClick={() => setIoTab("export")}>
+                导出
+              </button>
+              <button className={ioTab === "import" ? "segment active" : "segment"} type="button" onClick={() => setIoTab("import")}>
+                导入
+              </button>
+            </div>
+
+            {ioTab === "export" && (
+              <div className="io-modal-body">
+                <div className="segment-control">
+                  <button className={exportScope === "all" ? "segment active" : "segment"} type="button" onClick={() => setExportScope("all")}>
+                    全量导出
+                  </button>
+                  <button className={exportScope === "selected" ? "segment active" : "segment"} type="button" onClick={() => setExportScope("selected")}>
+                    按分组导出
+                  </button>
+                </div>
+
+                {exportScope === "selected" && (
+                  <div className="tag-grid">
+                    {groups.map((g) => (
+                      <button
+                        key={`export-${g.name}`}
+                        type="button"
+                        className={selectedExportGroups.includes(g.name) ? "tag-chip active" : "tag-chip"}
+                        onClick={() => toggleExportGroup(g.name)}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="io-path-line">
+                  <input value={exportPath} readOnly placeholder="导出路径将在保存后显示" />
+                  <button className="save-action" type="button" onClick={onExportConfig}>
+                    导出到文件
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {ioTab === "import" && (
+              <div className="io-modal-body">
+                <div className="io-path-line">
+                  <input value={importPath} readOnly placeholder="请选择导入文件（.yaml/.yml）" />
+                  <button className="ghost-action" type="button" onClick={onPickImportPath}>
+                    选择文件
+                  </button>
+                </div>
+
+                <div className="io-form-grid">
+                  <label>
+                    目标模式
+                    <select value={importTargetMode} onChange={(e) => setImportTargetMode(e.target.value as ImportTargetMode)}>
+                      <option value="keep_groups">保持原分组</option>
+                      <option value="into_group">导入到指定分组</option>
+                    </select>
+                  </label>
+                  <label>
+                    冲突策略
+                    <select value={importConflictStrategy} onChange={(e) => setImportConflictStrategy(e.target.value as ImportConflictStrategy)}>
+                      <option value="skip_existing">跳过已存在（默认）</option>
+                      <option value="overwrite_existing">覆盖已存在</option>
+                      <option value="only_add_new">仅新增</option>
+                    </select>
+                  </label>
+                </div>
+
+                {importTargetMode === "into_group" && (
+                  <div className="io-path-line">
+                    <input value={importTargetGroup} onChange={(e) => setImportTargetGroup(e.target.value)} placeholder="目标分组名" />
+                  </div>
+                )}
+
+                <div className="io-actions">
+                  <button className="ghost-action" type="button" onClick={onPreviewImport}>
+                    预览导入
+                  </button>
+                  <button className="save-action" type="button" onClick={onImportConfig}>
+                    确认导入
+                  </button>
+                </div>
+
+                {importPreview && (
+                  <div className="preview-stats">
+                    <div>
+                      <span className="eyebrow">分组 新增/跳过</span>
+                      <strong>{importPreview.groups_added}/{importPreview.groups_skipped}</strong>
+                    </div>
+                    <div>
+                      <span className="eyebrow">环境 新增/跳过</span>
+                      <strong>{importPreview.envs_added}/{importPreview.envs_skipped}</strong>
+                    </div>
+                    <div>
+                      <span className="eyebrow">变量 新增/覆盖/跳过</span>
+                      <strong>{importPreview.vars_added}/{importPreview.vars_overwritten}/{importPreview.vars_skipped}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {status && (
         <div className="toast" role="status">

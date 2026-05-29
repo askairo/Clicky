@@ -1,0 +1,15 @@
+groups:
+  default:
+    description: Default group
+    environments:
+      dev:
+        description: Local DEV defaults
+        variables:
+          ZNDER_MYSQL_HOST: "127.0.0.1"
+          ZNDER_MYSQL_PORT: "3306"
+          ZNDER_MYSQL_DB: "example_db"
+          ZNDER_MYSQL_USER: "example_user"
+          ZNDER_MYSQL_PASS: "<REPLACE_ME>"
+        hooks:
+          post:
+            - "echo Clicky switched to dev"

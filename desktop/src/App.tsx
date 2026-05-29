@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  Eye,
+  EyeOff,
+  FolderPlus,
+  Loader2,
+  Moon,
+  Plus,
+  Save,
+  Settings2,
+  Sparkles,
+  Sun,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 import clickyLogo from "./assets/clicky-logo.png";
 import "./App.css";
 
@@ -53,9 +70,19 @@ function isSensitiveKey(key: string) {
 }
 
 function displayValue(key: string, value?: string, reveal = false) {
-  if (value === undefined) return "（未设置）";
+  if (value === undefined) return "未设置";
   if (!isSensitiveKey(key) || reveal) return value;
-  return value.length === 0 ? "（空值）" : "••••••••";
+  return value.length === 0 ? "空值" : "••••••••";
+}
+
+function themeLabel(theme: ThemeMode) {
+  if (theme === "light") return "浅色";
+  if (theme === "dark") return "深色";
+  return "系统";
+}
+
+function isBrowserPreviewRuntimeError(error: unknown) {
+  return String(error).includes("Cannot read properties of undefined (reading 'invoke')");
 }
 
 function App() {
@@ -110,7 +137,9 @@ function App() {
   useEffect(() => {
     (async () => {
       await refreshGroups();
-    })().catch((e) => setStatus(`加载失败：${e}`));
+    })().catch((e) => {
+      if (!isBrowserPreviewRuntimeError(e)) setStatus(`加载失败：${e}`);
+    });
   }, []);
 
   useEffect(() => {
@@ -118,7 +147,9 @@ function App() {
     (async () => {
       await refreshEnvs(selectedGroup);
       await refreshActiveEnvs(selectedGroup);
-    })().catch((e) => setStatus(`读取分组失败：${e}`));
+    })().catch((e) => {
+      if (!isBrowserPreviewRuntimeError(e)) setStatus(`读取分组失败：${e}`);
+    });
   }, [selectedGroup]);
 
   useEffect(() => {
@@ -136,13 +167,30 @@ function App() {
         .map(([key, value]) => ({ key, value }));
       setDraftVars(next);
       setApplyResult(null);
-    })().catch((e) => setStatus(`读取环境失败：${e}`));
+    })().catch((e) => {
+      if (!isBrowserPreviewRuntimeError(e)) setStatus(`读取环境失败：${e}`);
+    });
   }, [selectedGroup, selectedEnv]);
+
+  const selectedGroupMeta = useMemo(
+    () => groups.find((group) => group.name === selectedGroup),
+    [groups, selectedGroup],
+  );
+
+  const selectedEnvMeta = useMemo(
+    () => envs.find((env) => env.name === selectedEnv),
+    [envs, selectedEnv],
+  );
+
+  const activeLabel = activeEnvs.length === 0 ? "无激活环境" : activeEnvs.join(", ");
 
   const hasDuplicateKeys = useMemo(() => {
     const keys = draftVars.map((v) => v.key.trim()).filter(Boolean);
     return new Set(keys).size !== keys.length;
   }, [draftVars]);
+
+  const lastApplyOk = applyResult?.variable_results.every((item) => item.applied) ?? false;
+  const appliedCount = applyResult?.variable_results.filter((item) => item.applied).length ?? 0;
 
   const onCreateGroup = async () => {
     const name = newGroupName.trim();
@@ -227,7 +275,7 @@ function App() {
         variables,
       });
       await refreshEnvs(selectedGroup, selectedEnv);
-      setStatus(`已保存环境 ${selectedGroup}/${selectedEnv}（${Object.keys(variables).length} 项）。`);
+      setStatus(`已保存 ${selectedGroup}/${selectedEnv}，共 ${Object.keys(variables).length} 项。`);
     } catch (e) {
       setStatus(`保存失败：${e}`);
     }
@@ -246,7 +294,7 @@ function App() {
       setApplyResult(result);
       await refreshActiveEnvs(selectedGroup);
       const okCount = result.variable_results.filter((x) => x.applied).length;
-      setStatus(`已应用 ${result.group}/${result.environment}，成功 ${okCount}/${result.variable_results.length} 个变量。请重新打开终端、IDE 或目标应用以读取最新环境变量。`);
+      setStatus(`已应用 ${result.group}/${result.environment}，成功 ${okCount}/${result.variable_results.length} 个变量。`);
     } catch (e) {
       setStatus(`应用失败：${e}`);
       setApplyResult(null);
@@ -256,181 +304,275 @@ function App() {
   };
 
   return (
-    <main className="container">
-      <header className="app-header">
-        <img className="app-logo" src={clickyLogo} alt="" aria-hidden="true" />
-        <div>
-          <p className="subtitle">一键切换用户级环境变量（Windows MVP，新进程生效）</p>
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <img className="app-logo" src={clickyLogo} alt="" aria-hidden="true" />
+          <div>
+            <h1>Clicky</h1>
+            <p>Environment switcher</p>
+          </div>
         </div>
-        <div className="theme-switch">
-          <label htmlFor="themeSelect">主题</label>
-          <select id="themeSelect" value={theme} onChange={(e) => setTheme(e.target.value as ThemeMode)}>
-            <option value="system">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
-          </select>
+
+        <div className="topbar-status" aria-label="当前状态">
+          <span className="state-dot" />
+          <span>{selectedGroup && selectedEnv ? `${selectedGroup} / ${selectedEnv}` : "未选择环境"}</span>
+        </div>
+
+        <div className="theme-control" role="group" aria-label="主题">
+          {(["system", "light", "dark"] as ThemeMode[]).map((mode) => (
+            <button
+              key={mode}
+              className={theme === mode ? "icon-button active" : "icon-button"}
+              onClick={() => setTheme(mode)}
+              title={themeLabel(mode)}
+              aria-label={themeLabel(mode)}
+              type="button"
+            >
+              {mode === "system" && <Sparkles size={16} />}
+              {mode === "light" && <Sun size={16} />}
+              {mode === "dark" && <Moon size={16} />}
+            </button>
+          ))}
         </div>
       </header>
 
-      <section className="panel indicator">
-        <strong>当前激活环境：</strong>
-        <span>
-          {activeEnvs.length === 0 ? "无" : activeEnvs.join(", ")}
-        </span>
-      </section>
-
-      <section className="panel">
-        <div className="row">
-          <div>
-            <label htmlFor="groupSelect">分组</label>
-            <select id="groupSelect" value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-              {groups.length === 0 && <option value="">暂无分组</option>}
-              {groups.map((g) => (
-                <option key={g.name} value={g.name}>{g.name} ({g.env_count})</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="newGroupName">新建分组</label>
-            <div className="inline">
-              <input id="newGroupName" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="例如：mysql" />
-              <button onClick={onCreateGroup}>创建</button>
-            </div>
-          </div>
+      <section className="summary-band" aria-label="环境概览">
+        <div>
+          <span className="eyebrow">Active</span>
+          <strong>{activeLabel}</strong>
         </div>
-
-        <div className="row" style={{ marginTop: 10 }}>
-          <div>
-            <label htmlFor="envSelect">环境</label>
-            <select id="envSelect" value={selectedEnv} onChange={(e) => setSelectedEnv(e.target.value)}>
-              {envs.length === 0 && <option value="">暂无可用环境</option>}
-              {envs.map((e) => (
-                <option key={e.name} value={e.name}>{e.name} ({e.var_count})</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="newEnvName">新建环境</label>
-            <div className="inline">
-              <input id="newEnvName" value={newEnvName} onChange={(e) => setNewEnvName(e.target.value)} placeholder="例如：uat" />
-              <button onClick={onCreateEnv}>创建</button>
-            </div>
-          </div>
+        <div>
+          <span className="eyebrow">Groups</span>
+          <strong>{groups.length}</strong>
         </div>
-
-        <p className="notice">应用后会写入 Windows 用户级环境变量；已经打开的终端、IDE 和业务进程通常需要重启后才会读取新值。</p>
-
-        <button onClick={onApply} disabled={!selectedGroup || !selectedEnv || busy}>
-          {busy ? "应用中..." : "应用环境"}
+        <div>
+          <span className="eyebrow">Variables</span>
+          <strong>{draftVars.filter((row) => row.key.trim()).length}</strong>
+        </div>
+        <button className="primary-action" onClick={onApply} disabled={!selectedGroup || !selectedEnv || busy}>
+          {busy ? <Loader2 className="spin" size={17} /> : <Wand2 size={17} />}
+          {busy ? "应用中" : "应用环境"}
         </button>
       </section>
 
-      <section className="panel">
-        <div className="section-title">
-          <h2>变量配置（组/环境）</h2>
-          <div className="inline">
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={revealSensitive}
-                onChange={(e) => setRevealSensitive(e.target.checked)}
-              />
-              显示敏感值
-            </label>
-            <button className="ghost" onClick={onAddRow}>新增变量</button>
-            <button onClick={onSaveVars} disabled={!selectedGroup || !selectedEnv}>保存配置</button>
-          </div>
-        </div>
-
-        {hasDuplicateKeys && <p className="warn">检测到重复变量名，请修正后保存。</p>}
-
-        <table>
-          <thead>
-            <tr>
-              <th>变量名</th>
-              <th>变量值</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {draftVars.map((row, idx) => (
-              <tr key={`row-${idx}`}>
-                <td><input value={row.key} onChange={(e) => onEditRow(idx, "key", e.target.value)} /></td>
-                <td>
-                  <input
-                    type={revealSensitive || !isSensitiveKey(row.key) ? "text" : "password"}
-                    value={row.value}
-                    onChange={(e) => onEditRow(idx, "value", e.target.value)}
-                  />
-                </td>
-                <td><button className="danger" onClick={() => onDeleteRow(idx)}>删除</button></td>
-              </tr>
-            ))}
-            {draftVars.length === 0 && (
-              <tr>
-                <td colSpan={3}>当前环境暂无变量，点击“新增变量”开始配置。</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
-
-      {applyResult && (
-        <section className="panel">
-          <h2>应用结果</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>变量名</th>
-                <th>应用前</th>
-                <th>应用后</th>
-                <th>状态</th>
-                <th>信息</th>
-              </tr>
-            </thead>
-            <tbody>
-              {applyResult.variable_results.map((r) => (
-                <tr key={r.key}>
-                  <td>{r.key}</td>
-                  <td>{displayValue(r.key, r.before, revealSensitive)}</td>
-                  <td>{displayValue(r.key, r.after, revealSensitive)}</td>
-                  <td>{r.applied ? "成功" : "失败"}</td>
-                  <td>{r.message}</td>
-                </tr>
+      <div className="workspace">
+        <aside className="sidebar" aria-label="环境导航">
+          <section className="sidebar-section">
+            <div className="section-heading">
+              <span>分组</span>
+              <span>{groups.length}</span>
+            </div>
+            <div className="item-list">
+              {groups.map((group) => (
+                <button
+                  key={group.name}
+                  className={group.name === selectedGroup ? "nav-item selected" : "nav-item"}
+                  onClick={() => setSelectedGroup(group.name)}
+                  type="button"
+                >
+                  <span>
+                    <strong>{group.name}</strong>
+                    <small>{group.env_count} 个环境</small>
+                  </span>
+                  <ChevronRight size={15} />
+                </button>
               ))}
-            </tbody>
-          </table>
+              {groups.length === 0 && <div className="empty-note">暂无分组</div>}
+            </div>
+            <div className="create-line">
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="新分组"
+              />
+              <button className="icon-button solid" onClick={onCreateGroup} title="创建分组" aria-label="创建分组">
+                <FolderPlus size={16} />
+              </button>
+            </div>
+          </section>
 
-          {applyResult.hook_results.length > 0 && (
-            <>
-              <h3>钩子执行</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>命令</th>
-                    <th>状态</th>
-                    <th>返回码</th>
-                    <th>信息</th>
+          <section className="sidebar-section">
+            <div className="section-heading">
+              <span>环境</span>
+              <span>{envs.length}</span>
+            </div>
+            <div className="item-list">
+              {envs.map((env) => {
+                const isActive = activeEnvs.includes(env.name);
+                return (
+                  <button
+                    key={env.name}
+                    className={env.name === selectedEnv ? "nav-item selected" : "nav-item"}
+                    onClick={() => setSelectedEnv(env.name)}
+                    type="button"
+                  >
+                    <span>
+                      <strong>{env.name}</strong>
+                      <small>{env.var_count} 个变量{isActive ? " · 已激活" : ""}</small>
+                    </span>
+                    {isActive ? <CheckCircle2 size={15} /> : <ChevronRight size={15} />}
+                  </button>
+                );
+              })}
+              {envs.length === 0 && <div className="empty-note">暂无环境</div>}
+            </div>
+            <div className="create-line">
+              <input
+                value={newEnvName}
+                onChange={(e) => setNewEnvName(e.target.value)}
+                placeholder="新环境"
+              />
+              <button className="icon-button solid" onClick={onCreateEnv} title="创建环境" aria-label="创建环境">
+                <Plus size={16} />
+              </button>
+            </div>
+          </section>
+        </aside>
+
+        <section className="workbench">
+          <div className="workbench-header">
+            <div>
+              <span className="eyebrow">Workspace</span>
+              <h2>{selectedEnv || "选择一个环境"}</h2>
+              <p>{selectedGroupMeta?.description || selectedEnvMeta?.description || "Windows 用户级环境变量"}</p>
+            </div>
+            <div className="toolbar">
+              <button
+                className="ghost-action"
+                onClick={() => setRevealSensitive((value) => !value)}
+                type="button"
+              >
+                {revealSensitive ? <EyeOff size={16} /> : <Eye size={16} />}
+                {revealSensitive ? "隐藏敏感值" : "显示敏感值"}
+              </button>
+              <button className="ghost-action" onClick={onAddRow} type="button">
+                <Plus size={16} />
+                新增变量
+              </button>
+              <button className="save-action" onClick={onSaveVars} disabled={!selectedGroup || !selectedEnv}>
+                <Save size={16} />
+                保存
+              </button>
+            </div>
+          </div>
+
+          {hasDuplicateKeys && (
+            <div className="inline-alert">
+              <CircleAlert size={16} />
+              <span>变量名重复，请修正后保存。</span>
+            </div>
+          )}
+
+          <div className="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>变量名</th>
+                  <th>变量值</th>
+                  <th aria-label="操作" />
+                </tr>
+              </thead>
+              <tbody>
+                {draftVars.map((row, idx) => (
+                  <tr key={`row-${idx}`}>
+                    <td>
+                      <input
+                        className="cell-input mono"
+                        value={row.key}
+                        onChange={(e) => onEditRow(idx, "key", e.target.value)}
+                        placeholder="VARIABLE_NAME"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="cell-input"
+                        type={revealSensitive || !isSensitiveKey(row.key) ? "text" : "password"}
+                        value={row.value}
+                        onChange={(e) => onEditRow(idx, "value", e.target.value)}
+                        placeholder="value"
+                      />
+                    </td>
+                    <td className="row-actions">
+                      <button
+                        className="icon-button danger"
+                        onClick={() => onDeleteRow(idx)}
+                        title="删除变量"
+                        aria-label="删除变量"
+                        type="button"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {applyResult.hook_results.map((h, idx) => (
-                    <tr key={`${h.command}-${idx}`}>
-                      <td>{h.command}</td>
-                      <td>{h.success ? "成功" : "失败"}</td>
-                      <td>{h.code ?? "-"}</td>
-                      <td>{h.message || "-"}</td>
+                ))}
+                {draftVars.length === 0 && (
+                  <tr>
+                    <td className="empty-table" colSpan={3}>
+                      <Settings2 size={18} />
+                      <span>当前环境暂无变量</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {applyResult && (
+            <section className={lastApplyOk ? "result-panel success" : "result-panel warning"}>
+              <div className="result-heading">
+                <div>
+                  <span className="eyebrow">Apply Result</span>
+                  <h3>
+                    {appliedCount}/{applyResult.variable_results.length} 已应用
+                  </h3>
+                </div>
+                {lastApplyOk ? <CheckCircle2 size={20} /> : <CircleAlert size={20} />}
+              </div>
+
+              <div className="table-shell compact">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>变量名</th>
+                      <th>应用前</th>
+                      <th>应用后</th>
+                      <th>状态</th>
                     </tr>
+                  </thead>
+                  <tbody>
+                    {applyResult.variable_results.map((result) => (
+                      <tr key={result.key}>
+                        <td className="mono">{result.key}</td>
+                        <td>{displayValue(result.key, result.before, revealSensitive)}</td>
+                        <td>{displayValue(result.key, result.after, revealSensitive)}</td>
+                        <td>{result.applied ? "成功" : result.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {applyResult.hook_results.length > 0 && (
+                <div className="hook-list">
+                  {applyResult.hook_results.map((hook, idx) => (
+                    <div className="hook-item" key={`${hook.command}-${idx}`}>
+                      <span className="mono">{hook.command}</span>
+                      <strong>{hook.success ? "成功" : "失败"}</strong>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </>
+                </div>
+              )}
+            </section>
           )}
         </section>
-      )}
+      </div>
 
-      {status && <p className="status">{status}</p>}
+      {status && (
+        <div className="toast" role="status">
+          {status}
+        </div>
+      )}
     </main>
   );
 }

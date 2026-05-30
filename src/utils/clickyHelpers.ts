@@ -15,7 +15,7 @@ export function displayValue(key: string, value?: string | null, reveal = false)
 export function themeLabel(theme: ThemeMode) {
   if (theme === "light") return "浅色";
   if (theme === "dark") return "深色";
-  return "系统";
+  return "跟随系统";
 }
 
 export function isBrowserPreviewRuntimeError(error: unknown) {

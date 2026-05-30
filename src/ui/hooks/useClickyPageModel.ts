@@ -28,11 +28,25 @@ import {
   renameEnvFlow,
   renameGroupFlow,
   saveVarsFlow,
-  type ApplyResultDto,
 } from "../../appservice/clickyAppService";
 import { isBrowserPreviewRuntimeError } from "../../utils/clickyHelpers";
 
 export function useClickyPageModel() {
+  type ActionModalPayload = {
+    title: string;
+    description?: string;
+    confirmLabel: string;
+    danger?: boolean;
+    primaryLabel?: string;
+    primaryPlaceholder?: string;
+    primaryValue: string;
+    secondaryLabel?: string;
+    secondaryPlaceholder?: string;
+    secondaryValue: string;
+    requireMatchText?: string;
+    onConfirm: (args: { primary: string; secondary: string }) => Promise<void> | void;
+  };
+
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
@@ -41,7 +55,6 @@ export function useClickyPageModel() {
   const [activeEnvs, setActiveEnvs] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [applyResult, setApplyResult] = useState<ApplyResultDto | null>(null);
   const [revealSensitive, setRevealSensitive] = useState(false);
   const [draftVars, setDraftVars] = useState<EditableVar[]>([]);
   const [ioModalOpen, setIoModalOpen] = useState(false);
@@ -55,6 +68,7 @@ export function useClickyPageModel() {
   const [importConflictStrategy, setImportConflictStrategy] =
     useState<ImportConflictStrategy>("skip_existing");
   const [importPreview, setImportPreview] = useState<ImportSummaryDto | null>(null);
+  const [actionModal, setActionModal] = useState<ActionModalPayload | null>(null);
 
   const refreshGroups = async (preferred?: string) => {
     const { list, target } = await loadGroups(preferred, selectedGroup);
@@ -96,22 +110,30 @@ export function useClickyPageModel() {
     loadDraftVariables(selectedGroup, selectedEnv)
       .then((next) => {
         setDraftVars(next);
-        setApplyResult(null);
       })
       .catch((e) => {
         if (!isBrowserPreviewRuntimeError(e)) setStatus(`读取环境失败：${e}`);
       });
   }, [selectedGroup, selectedEnv]);
 
+  useEffect(() => {
+    if (!status) return;
+    const timer = window.setTimeout(() => {
+      setStatus("");
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
   const selectedGroupMeta = useMemo(() => groups.find((g) => g.name === selectedGroup), [groups, selectedGroup]);
   const selectedEnvMeta = useMemo(() => envs.find((e) => e.name === selectedEnv), [envs, selectedEnv]);
   const activeLabel = activeEnvs.length === 0 ? "无激活环境" : activeEnvs.join(", ");
+  const selectedLabel = selectedGroup && selectedEnv ? `${selectedGroup}/${selectedEnv}` : "未选择环境";
+  const appliedLabel =
+    selectedGroup && activeEnvs.length > 0 ? activeEnvs.map((env) => `${selectedGroup}/${env}`).join(", ") : "未应用环境";
   const hasDuplicateKeys = useMemo(() => {
     const keys = draftVars.map((v) => v.key.trim()).filter(Boolean);
     return new Set(keys).size !== keys.length;
   }, [draftVars]);
-  const lastApplyOk = applyResult?.variable_results.every((item) => item.applied) ?? false;
-  const appliedCount = applyResult?.variable_results.filter((item) => item.applied).length ?? 0;
 
   const onCreateGroup = async (rawName?: string) => {
     try {
@@ -144,8 +166,17 @@ export function useClickyPageModel() {
   const onDeleteRow = (idx: number) => {
     const target = draftVars[idx];
     if (!target) return;
-    if (!window.confirm(`将删除变量 '${target.key || "(empty)"}'，是否继续？`)) return;
-    setDraftVars((prev) => prev.filter((_, i) => i !== idx));
+    setActionModal({
+      title: "删除变量",
+      description: `将删除变量“${target.key || "(empty)"}”，确认继续吗？`,
+      confirmLabel: "删除",
+      danger: true,
+      primaryValue: "",
+      secondaryValue: "",
+      onConfirm: () => {
+        setDraftVars((prev) => prev.filter((_, i) => i !== idx));
+      },
+    });
   };
 
   const onEditRow = (idx: number, field: "key" | "value", value: string) => {
@@ -169,12 +200,19 @@ export function useClickyPageModel() {
     setStatus("");
     try {
       const result = await applyEnvFlow(selectedGroup, selectedEnv);
-      setApplyResult(result.result);
       await refreshActiveEnvs(selectedGroup);
-      setStatus(result.message);
+      const total = result.result.variable_results.length;
+      const applied = result.result.variable_results.filter((item) => item.applied).length;
+      const failed = total - applied;
+      const changed = result.result.variable_results.filter((item) => (item.before ?? "") !== (item.after ?? "")).length;
+      const target = `${selectedGroup}/${selectedEnv}`;
+      setStatus(
+        failed === 0
+          ? `已应用 ${target}：处理 ${total} 个，实际变更 ${changed} 个。`
+          : `已应用 ${target}：处理 ${total} 个，实际变更 ${changed} 个，失败 ${failed} 个。`,
+      );
     } catch (e) {
       setStatus(`应用失败：${e}`);
-      setApplyResult(null);
     } finally {
       setBusy(false);
     }
@@ -182,67 +220,157 @@ export function useClickyPageModel() {
 
   const onRenameGroupModal = async () => {
     if (!selectedGroup) return;
-    const next = window.prompt("请输入新的分组名", selectedGroup)?.trim() ?? "";
-    try {
-      const result = await renameGroupFlow(selectedGroup, next, groups);
-      if (!result.ok) return setStatus(result.message);
-      await refreshGroups(result.next);
-      setStatus(result.message);
-    } catch (e) {
-      setStatus(`重命名分组失败：${e}`);
-    }
+    setActionModal({
+      title: "重命名分组",
+      description: "请输入新的分组名称。",
+      confirmLabel: "确认",
+      primaryLabel: "分组名称",
+      primaryPlaceholder: "请输入分组名称",
+      primaryValue: selectedGroup,
+      secondaryValue: "",
+      onConfirm: async ({ primary }) => {
+        try {
+          const result = await renameGroupFlow(selectedGroup, primary.trim(), groups);
+          if (!result.ok) return setStatus(result.message);
+          await refreshGroups(result.next);
+          setStatus(result.message);
+        } catch (e) {
+          setStatus(`重命名分组失败：${e}`);
+        }
+      },
+    });
   };
 
   const onDeleteGroupModal = async () => {
     if (!selectedGroup) return;
-    if (!window.confirm(`将删除分组 '${selectedGroup}'，并删除其下所有环境和变量。是否继续？`)) return;
-    const typed = window.prompt(`请输入分组名 '${selectedGroup}' 进行二次确认`);
-    if (typed?.trim() !== selectedGroup) return setStatus("二次确认未通过，已取消删除。");
-    try {
-      const result = await deleteGroupFlow(selectedGroup);
-      if (!result.ok) return;
-      await refreshGroups();
-      setStatus(result.message);
-    } catch (e) {
-      setStatus(`删除分组失败：${e}`);
-    }
+    setActionModal({
+      title: "删除分组",
+      description: `将删除分组“${selectedGroup}”及其下所有环境和变量。请输入分组名进行确认。`,
+      confirmLabel: "确认删除",
+      danger: true,
+      primaryLabel: "分组名称确认",
+      primaryPlaceholder: selectedGroup,
+      primaryValue: "",
+      secondaryValue: "",
+      requireMatchText: selectedGroup,
+      onConfirm: async () => {
+        try {
+          const result = await deleteGroupFlow(selectedGroup);
+          if (!result.ok) return;
+          await refreshGroups();
+          setStatus(result.message);
+        } catch (e) {
+          setStatus(`删除分组失败：${e}`);
+        }
+      },
+    });
   };
 
   const onRenameEnvModal = async () => {
     if (!selectedGroup || !selectedEnv) return;
-    const next = window.prompt("请输入新的环境名", selectedEnv)?.trim() ?? "";
-    try {
-      const result = await renameEnvFlow(selectedGroup, selectedEnv, next, envs);
-      if (!result.ok) return setStatus(result.message);
-      await refreshEnvs(selectedGroup, result.next);
-      setStatus(result.message);
-    } catch (e) {
-      setStatus(`重命名环境失败：${e}`);
-    }
+    setActionModal({
+      title: "重命名环境",
+      description: "请输入新的环境名称。",
+      confirmLabel: "确认",
+      primaryLabel: "环境名称",
+      primaryPlaceholder: "请输入环境名称",
+      primaryValue: selectedEnv,
+      secondaryValue: "",
+      onConfirm: async ({ primary }) => {
+        try {
+          const result = await renameEnvFlow(selectedGroup, selectedEnv, primary.trim(), envs);
+          if (!result.ok) return setStatus(result.message);
+          await refreshEnvs(selectedGroup, result.next);
+          setStatus(result.message);
+        } catch (e) {
+          setStatus(`重命名环境失败：${e}`);
+        }
+      },
+    });
   };
 
   const onDeleteEnvModal = async () => {
     if (!selectedGroup || !selectedEnv) return;
-    if (!window.confirm(`将删除环境 '${selectedEnv}'，并删除该环境下所有变量。是否继续？`)) return;
-    const typed = window.prompt(`请输入环境名 '${selectedEnv}' 进行二次确认`);
-    if (typed?.trim() !== selectedEnv) return setStatus("二次确认未通过，已取消删除。");
-    try {
-      const result = await deleteEnvFlow(selectedGroup, selectedEnv);
-      if (!result.ok) return;
-      await refreshEnvs(selectedGroup);
-      setStatus(result.message);
-    } catch (e) {
-      setStatus(`删除环境失败：${e}`);
-    }
+    setActionModal({
+      title: "删除环境",
+      description: `将删除环境“${selectedEnv}”及其下所有变量。请输入环境名进行确认。`,
+      confirmLabel: "确认删除",
+      danger: true,
+      primaryLabel: "环境名称确认",
+      primaryPlaceholder: selectedEnv,
+      primaryValue: "",
+      secondaryValue: "",
+      requireMatchText: selectedEnv,
+      onConfirm: async () => {
+        try {
+          const result = await deleteEnvFlow(selectedGroup, selectedEnv);
+          if (!result.ok) return;
+          await refreshEnvs(selectedGroup);
+          setStatus(result.message);
+        } catch (e) {
+          setStatus(`删除环境失败：${e}`);
+        }
+      },
+    });
   };
 
-  const onCreateGroupModal = async () => onCreateGroup(window.prompt("请输入分组名称") ?? "");
-  const onCreateEnvModal = async () => onCreateEnv(window.prompt("请输入环境名称") ?? "");
+  const onCreateGroupModal = async () => {
+    setActionModal({
+      title: "新建分组",
+      description: "请输入分组名称。",
+      confirmLabel: "创建",
+      primaryLabel: "分组名称",
+      primaryPlaceholder: "例如 znder-erp",
+      primaryValue: "",
+      secondaryValue: "",
+      onConfirm: async ({ primary }) => onCreateGroup(primary),
+    });
+  };
+  const onCreateEnvModal = async () => {
+    setActionModal({
+      title: "新建环境",
+      description: "请输入环境名称。",
+      confirmLabel: "创建",
+      primaryLabel: "环境名称",
+      primaryPlaceholder: "例如 dev / sit / prod",
+      primaryValue: "",
+      secondaryValue: "",
+      onConfirm: async ({ primary }) => onCreateEnv(primary),
+    });
+  };
   const onAddRowModal = () => {
-    const key = window.prompt("请输入变量名（例如 MYSQL_HOST）") ?? "";
-    if (!key.trim()) return;
-    const value = window.prompt(`请输入 ${key.trim()} 的变量值`) ?? "";
-    onAddRow(key, value);
+    setActionModal({
+      title: "新增变量",
+      description: "请输入变量名和值。",
+      confirmLabel: "添加",
+      primaryLabel: "变量名",
+      primaryPlaceholder: "例如 MYSQL_HOST",
+      primaryValue: "",
+      secondaryLabel: "变量值",
+      secondaryPlaceholder: "请输入变量值",
+      secondaryValue: "",
+      onConfirm: ({ primary, secondary }) => {
+        onAddRow(primary, secondary);
+      },
+    });
+  };
+
+  const closeActionModal = () => setActionModal(null);
+  const onActionModalPrimaryChange = (value: string) =>
+    setActionModal((prev) => (prev ? { ...prev, primaryValue: value } : prev));
+  const onActionModalSecondaryChange = (value: string) =>
+    setActionModal((prev) => (prev ? { ...prev, secondaryValue: value } : prev));
+  const onActionModalConfirm = async () => {
+    if (!actionModal) return;
+    if (actionModal.requireMatchText && actionModal.primaryValue.trim() !== actionModal.requireMatchText) {
+      setStatus("二次确认未通过，已取消操作。");
+      return;
+    }
+    await actionModal.onConfirm({
+      primary: actionModal.primaryValue,
+      secondary: actionModal.secondaryValue,
+    });
+    setActionModal(null);
   };
 
   const toggleExportGroup = (name: string) => {
@@ -306,7 +434,6 @@ export function useClickyPageModel() {
     activeEnvs,
     status,
     busy,
-    applyResult,
     revealSensitive,
     setRevealSensitive,
     draftVars,
@@ -329,9 +456,9 @@ export function useClickyPageModel() {
     selectedGroupMeta,
     selectedEnvMeta,
     activeLabel,
+    selectedLabel,
+    appliedLabel,
     hasDuplicateKeys,
-    lastApplyOk,
-    appliedCount,
     onCreateGroupModal,
     onRenameGroupModal,
     onDeleteGroupModal,
@@ -348,6 +475,11 @@ export function useClickyPageModel() {
     onPickImportPath,
     onPreviewImport,
     onImportConfig,
+    actionModal,
+    closeActionModal,
+    onActionModalPrimaryChange,
+    onActionModalSecondaryChange,
+    onActionModalConfirm,
   };
 }
 

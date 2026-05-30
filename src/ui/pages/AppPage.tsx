@@ -19,7 +19,7 @@
 import "../styles/app.css";
 import { useClickyPageModel } from "../hooks/useClickyPageModel";
 import type { ImportConflictStrategy, ImportTargetMode, ThemeMode } from "../../domain";
-import { displayValue, isSensitiveKey, themeLabel } from "../../utils/clickyHelpers";
+import { isSensitiveKey, themeLabel } from "../../utils/clickyHelpers";
 
 function App() {
   const c = useClickyPageModel();
@@ -31,13 +31,13 @@ function App() {
           <img className="app-logo" src="/clicky-logo.png" alt="" aria-hidden="true" />
           <div>
             <h1>Clicky</h1>
-            <p>Environment switcher</p>
+            <p>环境切换工具</p>
           </div>
         </div>
 
         <div className="topbar-status" aria-label="当前状态">
           <span className="state-dot" />
-          <span>{c.selectedGroup && c.selectedEnv ? `${c.selectedGroup} / ${c.selectedEnv}` : "未选择环境"}</span>
+          <span>{c.appliedLabel}</span>
         </div>
 
         <div className="theme-control" role="group" aria-label="主题">
@@ -60,20 +60,12 @@ function App() {
 
       <section className="summary-band" aria-label="环境概览">
         <div>
-          <span className="eyebrow">Active</span>
-          <strong>{c.activeLabel}</strong>
-        </div>
-        <div>
-          <span className="eyebrow">Groups</span>
-          <strong>{c.groups.length}</strong>
-        </div>
-        <div>
-          <span className="eyebrow">Variables</span>
-          <strong>{c.draftVars.filter((row) => row.key.trim()).length}</strong>
+          <span className="eyebrow">当前选中</span>
+          <strong>{c.selectedLabel}</strong>
         </div>
         <button className="primary-action" onClick={c.onApply} disabled={!c.selectedGroup || !c.selectedEnv || c.busy}>
           {c.busy ? <Loader2 className="spin" size={17} /> : <Wand2 size={17} />}
-          {c.busy ? "应用中" : "应用环境"}
+          {c.busy ? "应用中" : "应用"}
         </button>
       </section>
 
@@ -141,10 +133,8 @@ function App() {
 
         <section className="workbench">
           <div className="workbench-header">
-            <div>
-              <span className="eyebrow">Workspace</span>
-              <h2>{c.selectedEnv || "选择一个环境"}</h2>
-              <p>{c.selectedGroupMeta?.description || c.selectedEnvMeta?.description || "Windows 用户级环境变量"}</p>
+            <div className="workbench-meta">
+              <span className="section-heading-label">变量</span>
             </div>
             <div className="toolbar">
               <button className="ghost-action" onClick={() => { c.setIoModalOpen(true); c.setIoTab("export"); }} type="button">
@@ -181,36 +171,6 @@ function App() {
             </table>
           </div>
 
-          {c.applyResult && (
-            <section className={c.lastApplyOk ? "result-panel success" : "result-panel warning"}>
-              <div className="result-heading">
-                <div><span className="eyebrow">Apply Result</span><h3>{c.appliedCount}/{c.applyResult.variable_results.length} 已应用</h3></div>
-                {c.lastApplyOk ? <CheckCircle2 size={20} /> : <CircleAlert size={20} />}
-              </div>
-              <div className="table-shell compact">
-                <table>
-                  <thead><tr><th>变量名</th><th>应用前</th><th>应用后</th><th>状态</th></tr></thead>
-                  <tbody>
-                    {c.applyResult.variable_results.map((result) => (
-                      <tr key={result.key}>
-                        <td className="mono">{result.key}</td>
-                        <td>{displayValue(result.key, result.before, c.revealSensitive)}</td>
-                        <td>{displayValue(result.key, result.after, c.revealSensitive)}</td>
-                        <td>{result.applied ? "成功" : result.message}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {c.applyResult.hook_results.length > 0 && (
-                <div className="hook-list">
-                  {c.applyResult.hook_results.map((hook, idx) => (
-                    <div className="hook-item" key={`${hook.command}-${idx}`}><span className="mono">{hook.command}</span><strong>{hook.success ? "成功" : "失败"}</strong></div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
         </section>
       </div>
 
@@ -218,7 +178,7 @@ function App() {
         <div className="modal-backdrop" role="presentation" onClick={() => c.setIoModalOpen(false)}>
           <section className="io-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <header className="io-modal-header">
-              <div><span className="eyebrow">Config I/O</span><h3>导入 / 导出</h3></div>
+              <div><span className="eyebrow">配置管理</span><h3>导入 / 导出</h3></div>
               <button className="icon-button" type="button" onClick={() => c.setIoModalOpen(false)} aria-label="关闭"><X size={16} /></button>
             </header>
 
@@ -290,6 +250,51 @@ function App() {
                 )}
               </div>
             )}
+          </section>
+        </div>
+      )}
+
+      {c.actionModal && (
+        <div className="modal-backdrop" role="presentation" onClick={c.closeActionModal}>
+          <section className="action-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <header className="io-modal-header">
+              <div>
+                <h3>{c.actionModal.title}</h3>
+                {c.actionModal.description && <p>{c.actionModal.description}</p>}
+              </div>
+              <button className="icon-button" type="button" onClick={c.closeActionModal} aria-label="关闭"><X size={16} /></button>
+            </header>
+
+            <div className="action-modal-body">
+              {c.actionModal.primaryLabel && (
+                <label className="action-modal-label">
+                  <span>{c.actionModal.primaryLabel}</span>
+                  <input
+                    autoFocus
+                    value={c.actionModal.primaryValue}
+                    onChange={(e) => c.onActionModalPrimaryChange(e.target.value)}
+                    placeholder={c.actionModal.primaryPlaceholder}
+                  />
+                </label>
+              )}
+              {c.actionModal.secondaryLabel && (
+                <label className="action-modal-label">
+                  <span>{c.actionModal.secondaryLabel}</span>
+                  <input
+                    value={c.actionModal.secondaryValue}
+                    onChange={(e) => c.onActionModalSecondaryChange(e.target.value)}
+                    placeholder={c.actionModal.secondaryPlaceholder}
+                  />
+                </label>
+              )}
+            </div>
+
+            <footer className="action-modal-actions">
+              <button className="ghost-action" type="button" onClick={c.closeActionModal}>取消</button>
+              <button className={c.actionModal.danger ? "danger-action" : "save-action"} type="button" onClick={c.onActionModalConfirm}>
+                {c.actionModal.confirmLabel}
+              </button>
+            </footer>
           </section>
         </div>
       )}

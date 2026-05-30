@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { listen } from "@tauri-apps/api/event";
+import { useEffect, useMemo, useState } from "react";
 import type {
   EditableVar,
   EnvSummary,
@@ -123,6 +124,22 @@ export function useClickyPageModel() {
     }, 4000);
     return () => window.clearTimeout(timer);
   }, [status]);
+
+  useEffect(() => {
+    let unlisten: undefined | (() => void);
+    listen<string>("tray-switch-status", (event) => {
+      setStatus(event.payload);
+    })
+      .then((dispose) => {
+        unlisten = dispose;
+      })
+      .catch(() => {
+        // Browser preview has no tauri bridge.
+      });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   const selectedGroupMeta = useMemo(() => groups.find((g) => g.name === selectedGroup), [groups, selectedGroup]);
   const selectedEnvMeta = useMemo(() => envs.find((e) => e.name === selectedEnv), [envs, selectedEnv]);

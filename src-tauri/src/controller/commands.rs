@@ -3,6 +3,7 @@ use crate::domain::{
     ApplyResult, EnvSummary, ExportRequest, ExportResult, GroupSummary, ImportRequest, ImportSummary,
 };
 use std::collections::HashMap;
+use tauri::State;
 
 #[tauri::command]
 pub fn list_groups() -> Result<Vec<GroupSummary>, String> {
@@ -74,6 +75,15 @@ pub fn save_environment_variables(
 }
 
 #[tauri::command]
-pub fn apply_environment(group_name: String, env_name: String, mode: String) -> Result<ApplyResult, String> {
-    appservice::apply_environment_flow(group_name, env_name, mode)
+pub fn apply_environment(
+    group_name: String,
+    env_name: String,
+    mode: String,
+    state: State<'_, crate::AppRuntimeState>,
+) -> Result<ApplyResult, String> {
+    let result = appservice::apply_environment_flow(group_name.clone(), env_name.clone(), mode);
+    if result.is_ok() {
+        crate::remember_recent_env(&state, &group_name, &env_name);
+    }
+    result
 }

@@ -4,6 +4,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use rusqlite::{params, Connection};
+#[cfg(target_os = "windows")]
+use winreg::enums::HKEY_CURRENT_USER;
+#[cfg(target_os = "windows")]
+use winreg::RegKey;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct ConfigFile {
@@ -910,14 +914,13 @@ fn save_environment_variables(
 
 #[cfg(target_os = "windows")]
 fn apply_var_persistent_windows(key: &str, value: &str) -> Result<(), String> {
-    let status = Command::new("setx")
-        .arg(key)
-        .arg(value)
-        .status()
-        .map_err(|e| format!("setx {} failed: {}", key, e))?;
-    if !status.success() {
-        return Err(format!("setx {} failed with status {}", key, status));
-    }
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let (env_key, _disp) = hkcu
+        .create_subkey("Environment")
+        .map_err(|e| format!("open HKCU\\Environment failed for '{}': {}", key, e))?;
+    env_key
+        .set_value(key, &value)
+        .map_err(|e| format!("write HKCU\\Environment\\{} failed: {}", key, e))?;
     std::env::set_var(key, value);
     Ok(())
 }

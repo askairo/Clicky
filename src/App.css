@@ -200,14 +200,15 @@ h1 {
 }
 
 .icon-button.danger {
-  border-color: transparent;
-  background: transparent;
-  color: var(--faint);
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--danger);
 }
 
 .icon-button.danger:hover {
   background: var(--danger-soft);
   color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
 }
 
 .summary-band {
@@ -331,7 +332,7 @@ h1 {
 .section-heading-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .section-heading-actions .icon-button {

@@ -8,7 +8,6 @@ import {
   Edit3,
   Eye,
   EyeOff,
-  FolderPlus,
   Loader2,
   Moon,
   Plus,
@@ -112,11 +111,9 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>("");
-  const [newGroupName, setNewGroupName] = useState<string>("");
 
   const [envs, setEnvs] = useState<EnvSummary[]>([]);
   const [selectedEnv, setSelectedEnv] = useState<string>("");
-  const [newEnvName, setNewEnvName] = useState<string>("");
 
   const [activeEnvs, setActiveEnvs] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("");
@@ -226,8 +223,8 @@ function App() {
   const lastApplyOk = applyResult?.variable_results.every((item) => item.applied) ?? false;
   const appliedCount = applyResult?.variable_results.filter((item) => item.applied).length ?? 0;
 
-  const onCreateGroup = async () => {
-    const name = newGroupName.trim();
+  const onCreateGroup = async (rawName?: string) => {
+    const name = (rawName ?? "").trim();
     if (!name) {
       setStatus("请输入分组名称。");
       return;
@@ -240,15 +237,14 @@ function App() {
     try {
       await invoke("create_group", { groupName: name });
       await refreshGroups(name);
-      setNewGroupName("");
       setStatus(`已创建分组：${name}`);
     } catch (e) {
       setStatus(`创建分组失败：${e}`);
     }
   };
 
-  const onCreateEnv = async () => {
-    const name = newEnvName.trim();
+  const onCreateEnv = async (rawName?: string) => {
+    const name = (rawName ?? "").trim();
     if (!selectedGroup) {
       setStatus("请先选择分组。");
       return;
@@ -269,18 +265,27 @@ function App() {
         variables: {},
       });
       await refreshEnvs(selectedGroup, name);
-      setNewEnvName("");
       setStatus(`已创建环境：${selectedGroup}/${name}`);
     } catch (e) {
       setStatus(`创建环境失败：${e}`);
     }
   };
 
-  const onAddRow = () => {
-    setDraftVars((prev) => [...prev, { key: "", value: "" }]);
+  const onAddRow = (key?: string, value?: string) => {
+    const nextKey = (key ?? "").trim();
+    if (!nextKey) return;
+    if (draftVars.some((item) => item.key.trim() === nextKey)) {
+      setStatus(`变量 ${nextKey} 已存在。`);
+      return;
+    }
+    setDraftVars((prev) => [...prev, { key: nextKey, value: value ?? "" }]);
   };
 
   const onDeleteRow = (idx: number) => {
+    const target = draftVars[idx];
+    if (!target) return;
+    const ok = window.confirm(`将删除变量 '${target.key || "(empty)"}'，是否继续？`);
+    if (!ok) return;
     setDraftVars((prev) => prev.filter((_, i) => i !== idx));
   };
 
@@ -405,6 +410,23 @@ function App() {
     } catch (e) {
       setStatus(`删除环境失败：${e}`);
     }
+  };
+
+  const onCreateGroupModal = async () => {
+    const name = window.prompt("请输入分组名称") ?? "";
+    await onCreateGroup(name);
+  };
+
+  const onCreateEnvModal = async () => {
+    const name = window.prompt("请输入环境名称") ?? "";
+    await onCreateEnv(name);
+  };
+
+  const onAddRowModal = () => {
+    const key = window.prompt("请输入变量名（例如 MYSQL_HOST）") ?? "";
+    if (!key.trim()) return;
+    const value = window.prompt(`请输入 ${key.trim()} 的变量值`) ?? "";
+    onAddRow(key, value);
   };
 
   const toggleExportGroup = (name: string) => {
@@ -551,7 +573,9 @@ function App() {
             <div className="section-heading">
               <span>分组</span>
               <div className="section-heading-actions">
-                <span>{groups.length}</span>
+                <button className="icon-button" type="button" title="新建分组" onClick={onCreateGroupModal}>
+                  <Plus size={14} />
+                </button>
                 <button className="icon-button" type="button" title="重命名分组" onClick={onRenameGroupModal}>
                   <Edit3 size={14} />
                 </button>
@@ -577,23 +601,15 @@ function App() {
               ))}
               {groups.length === 0 && <div className="empty-note">暂无分组</div>}
             </div>
-            <div className="create-line">
-              <input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="新分组"
-              />
-              <button className="icon-button solid" onClick={onCreateGroup} title="创建分组" aria-label="创建分组">
-                <FolderPlus size={16} />
-              </button>
-            </div>
           </section>
 
           <section className="sidebar-section">
             <div className="section-heading">
               <span>环境</span>
               <div className="section-heading-actions">
-                <span>{envs.length}</span>
+                <button className="icon-button" type="button" title="新建环境" onClick={onCreateEnvModal}>
+                  <Plus size={14} />
+                </button>
                 <button className="icon-button" type="button" title="重命名环境" onClick={onRenameEnvModal}>
                   <Edit3 size={14} />
                 </button>
@@ -621,16 +637,6 @@ function App() {
                 );
               })}
               {envs.length === 0 && <div className="empty-note">暂无环境</div>}
-            </div>
-            <div className="create-line">
-              <input
-                value={newEnvName}
-                onChange={(e) => setNewEnvName(e.target.value)}
-                placeholder="新环境"
-              />
-              <button className="icon-button solid" onClick={onCreateEnv} title="创建环境" aria-label="创建环境">
-                <Plus size={16} />
-              </button>
             </div>
           </section>
         </aside>
@@ -662,7 +668,7 @@ function App() {
                 {revealSensitive ? <EyeOff size={16} /> : <Eye size={16} />}
                 {revealSensitive ? "隐藏敏感值" : "显示敏感值"}
               </button>
-              <button className="ghost-action" onClick={onAddRow} type="button">
+              <button className="ghost-action" onClick={onAddRowModal} type="button">
                 <Plus size={16} />
                 新增变量
               </button>

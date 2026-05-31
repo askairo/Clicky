@@ -4,23 +4,49 @@
 
 ### 项目简介
 
-Clicky 是一个受 SwitchHosts 启发的桌面工具，用于切换环境变量（不仅限于 hosts）。
+Clicky 是一个受 SwitchHosts 启发的跨平台桌面工具，专注于环境变量分组管理与一键切换。
 
 ### 当前状态
 
-- Windows 优先
+- Windows + macOS 双平台支持
 - 基于 Tauri + React 的桌面应用
 - 前端采用分层结构：`ui / appservice / service / domain / utils`
 - 支持环境变量配置管理与一键应用
 - 默认对敏感变量脱敏显示
 - 支持切换后执行 `hooks.post` 命令
 
-### 运行方式（Windows）
+### 安装方式（Windows / macOS）
+
+#### 方式一：从 GitHub Releases 下载
+
+- Windows：下载 `.exe` 或 `.msi`
+- macOS：下载 `.dmg`
+- Release 页面：<https://github.com/askairo/Clicky/releases>
+
+#### 方式二：Homebrew（macOS）
+
+```bash
+brew tap askairo/tap
+brew install clicky
+```
+
+### 本地运行（开发）
 
 ```powershell
 npm install
 npm run tauri dev
 ```
+
+### macOS 首次打开（未签名提示）
+
+如果提示“已损坏/无法打开”，通常是 macOS Gatekeeper 对未签名应用的拦截。可执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Clicky.app
+open /Applications/Clicky.app
+```
+
+若仍被拦截，请在「系统设置 -> 隐私与安全性」中对 Clicky 选择“仍要打开”。
 
 ### 配置与存储
 
@@ -37,23 +63,49 @@ npm run tauri dev
 
 ### Overview
 
-Clicky is a desktop tool inspired by SwitchHosts for switching environment variables (not limited to hosts).
+Clicky is a cross-platform desktop app inspired by SwitchHosts, focused on grouped environment-variable management and one-click switching.
 
 ### Current Status
 
-- Windows-first
+- Windows + macOS supported
 - Desktop app built with Tauri + React
 - Frontend layered architecture: `ui / appservice / service / domain / utils`
 - Supports environment-variable config management and one-click apply
 - Sensitive values are masked by default
 - Supports post-switch `hooks.post` commands
 
-### Run (Windows)
+### Install (Windows / macOS)
+
+#### Option 1: Download from GitHub Releases
+
+- Windows: download `.exe` or `.msi`
+- macOS: download `.dmg`
+- Release page: <https://github.com/askairo/Clicky/releases>
+
+#### Option 2: Homebrew (macOS)
+
+```bash
+brew tap askairo/tap
+brew install clicky
+```
+
+### Local Run (Development)
 
 ```powershell
 npm install
 npm run tauri dev
 ```
+
+### First Launch on macOS (Unsigned App Warning)
+
+If macOS reports the app is damaged or cannot be opened, it is usually Gatekeeper blocking an unsigned app. Run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Clicky.app
+open /Applications/Clicky.app
+```
+
+If needed, go to `System Settings -> Privacy & Security` and choose "Open Anyway" for Clicky.
 
 ### Config and Storage
 

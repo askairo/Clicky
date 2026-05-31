@@ -59,6 +59,7 @@ export function useClickyPageModel() {
   const [busy, setBusy] = useState(false);
   const [revealSensitive, setRevealSensitive] = useState(false);
   const [draftVars, setDraftVars] = useState<EditableVar[]>([]);
+  const [baseVars, setBaseVars] = useState<EditableVar[]>([]);
   const [ioModalOpen, setIoModalOpen] = useState(false);
   const [ioTab, setIoTab] = useState<"export" | "import">("export");
   const [exportScope, setExportScope] = useState<"all" | "selected">("all");
@@ -112,6 +113,7 @@ export function useClickyPageModel() {
     loadDraftVariables(selectedGroup, selectedEnv)
       .then((next) => {
         setDraftVars(next);
+        setBaseVars(next);
       })
       .catch((e) => {
         if (!isBrowserPreviewRuntimeError(e)) setStatus(`读取环境失败：${e}`);
@@ -180,6 +182,14 @@ export function useClickyPageModel() {
     const keys = draftVars.map((v) => v.key.trim()).filter(Boolean);
     return new Set(keys).size !== keys.length;
   }, [draftVars]);
+  const hasUnsavedChanges = useMemo(() => {
+    const normalize = (rows: EditableVar[]) =>
+      rows
+        .map((row) => ({ key: row.key.trim(), value: row.value }))
+        .filter((row) => row.key.length > 0)
+        .sort((a, b) => a.key.localeCompare(b.key));
+    return JSON.stringify(normalize(draftVars)) !== JSON.stringify(normalize(baseVars));
+  }, [draftVars, baseVars]);
 
   const onCreateGroup = async (rawName?: string) => {
     try {
@@ -204,6 +214,10 @@ export function useClickyPageModel() {
   };
 
   const onAddRow = (key?: string, value?: string) => {
+    if (key === undefined && value === undefined) {
+      setDraftVars((prev) => [...prev, { key: "", value: "" }]);
+      return;
+    }
     const result = appendDraftVar(draftVars, key, value);
     if (!result.ok || !result.next) return setStatus(result.message);
     setDraftVars(result.next);
@@ -234,6 +248,9 @@ export function useClickyPageModel() {
       const result = await saveVarsFlow(selectedGroup, selectedEnv, draftVars);
       if (!result.ok) return setStatus(result.message);
       await refreshEnvs(selectedGroup, selectedEnv);
+      const refreshed = await loadDraftVariables(selectedGroup, selectedEnv);
+      setDraftVars(refreshed);
+      setBaseVars(refreshed);
       setStatus(result.message);
     } catch (e) {
       setStatus(`保存失败：${e}`);
@@ -505,12 +522,14 @@ export function useClickyPageModel() {
     selectedLabel,
     appliedLabel,
     hasDuplicateKeys,
+    hasUnsavedChanges,
     onCreateGroupModal,
     onRenameGroupModal,
     onDeleteGroupModal,
     onCreateEnvModal,
     onRenameEnvModal,
     onDeleteEnvModal,
+    onAddRow,
     onAddRowModal,
     onDeleteRow,
     onEditRow,

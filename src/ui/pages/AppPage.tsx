@@ -1,4 +1,5 @@
 ﻿import {
+  ArrowLeftRight,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
@@ -63,9 +64,13 @@ function App() {
           <span className="eyebrow">当前选中</span>
           <strong>{c.selectedLabel}</strong>
         </div>
-        <button className="primary-action" onClick={c.onApply} disabled={!c.selectedGroup || !c.selectedEnv || c.busy}>
+        <button
+          className={c.busy ? "primary-action is-busy" : "primary-action"}
+          onClick={c.onApply}
+          disabled={!c.selectedGroup || !c.selectedEnv || c.busy}
+        >
           {c.busy ? <Loader2 className="spin" size={17} /> : <Wand2 size={17} />}
-          {c.busy ? "应用中" : "应用"}
+          {c.busy ? "正在应用..." : "立即应用"}
         </button>
       </section>
 
@@ -114,7 +119,11 @@ function App() {
                 return (
                   <button
                     key={env.name}
-                    className={env.name === c.selectedEnv ? "nav-item selected" : "nav-item"}
+                    className={[
+                      "nav-item",
+                      env.name === c.selectedEnv ? "selected" : "",
+                      isActive ? "active-env" : "",
+                    ].filter(Boolean).join(" ")}
                     onClick={() => c.setSelectedEnv(env.name)}
                     type="button"
                   >
@@ -137,15 +146,42 @@ function App() {
               <span className="section-heading-label">变量</span>
             </div>
             <div className="toolbar">
-              <button className="ghost-action" onClick={() => { c.setIoModalOpen(true); c.setIoTab("export"); }} type="button">
-                <Settings2 size={16} />导入/导出
-              </button>
-              <button className="ghost-action" onClick={() => c.setRevealSensitive((value) => !value)} type="button">
-                {c.revealSensitive ? <EyeOff size={16} /> : <Eye size={16} />}
-                {c.revealSensitive ? "隐藏敏感值" : "显示敏感值"}
-              </button>
-              <button className="ghost-action" onClick={c.onAddRowModal} type="button"><Plus size={16} />新增变量</button>
-              <button className="save-action" onClick={c.onSaveVars} disabled={!c.selectedGroup || !c.selectedEnv}><Save size={16} />保存</button>
+              <div className="toolbar-group" role="group" aria-label="变量显示与导入导出">
+                <button
+                  className="icon-button"
+                  onClick={() => { c.setIoModalOpen(true); c.setIoTab("export"); }}
+                  type="button"
+                  title="导入/导出配置"
+                  aria-label="导入/导出配置"
+                >
+                  <ArrowLeftRight size={16} />
+                </button>
+                <button
+                  className="icon-button"
+                  onClick={() => c.setRevealSensitive((value) => !value)}
+                  type="button"
+                  title={c.revealSensitive ? "隐藏敏感值" : "显示敏感值"}
+                  aria-label={c.revealSensitive ? "隐藏敏感值" : "显示敏感值"}
+                >
+                  {c.revealSensitive ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <span className="toolbar-divider" aria-hidden="true" />
+              <div className="toolbar-group" role="group" aria-label="变量编辑">
+                <button className="icon-button" onClick={() => c.onAddRow()} type="button" title="新增变量" aria-label="新增变量">
+                  <Plus size={16} />
+                </button>
+                <button
+                  className={c.hasUnsavedChanges ? "icon-button solid" : "icon-button"}
+                  onClick={c.onSaveVars}
+                  disabled={!c.selectedGroup || !c.selectedEnv || !c.hasUnsavedChanges}
+                  type="button"
+                  title="保存更改"
+                  aria-label="保存更改"
+                >
+                  <Save size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -305,6 +341,8 @@ function App() {
 }
 
 export default App;
+
+
 
 
 

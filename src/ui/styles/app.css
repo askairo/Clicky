@@ -17,6 +17,8 @@
   --warn-soft: #f8efd8;
   --success: #2d7b55;
   --shadow: 0 20px 60px rgba(31, 40, 28, 0.08);
+  --icon-btn-md: 30px;
+  --icon-btn-sm: 28px;
   color: var(--text);
   background: var(--bg);
   font-family:
@@ -102,14 +104,14 @@ button:not(:disabled) {
 .app-shell {
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 22px 0 28px;
+  padding: 16px 0 24px;
 }
 
 .topbar {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .brand {
@@ -117,12 +119,40 @@ button:not(:disabled) {
   align-items: center;
   min-width: 0;
   gap: 12px;
+  position: relative;
 }
 
 .app-logo {
   width: 42px;
   height: 42px;
   flex: 0 0 auto;
+  image-rendering: auto;
+}
+
+.app-logo-dark {
+  display: block;
+}
+
+.app-logo-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .app-logo-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .app-logo-light {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .app-logo-dark {
+    display: none;
+  }
+
+  :root[data-theme="system"] .app-logo-light {
+    display: block;
+  }
 }
 
 h1,
@@ -133,16 +163,16 @@ p {
 }
 
 h1 {
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 720;
   line-height: 1.05;
 }
 
 .brand p,
 .workbench-header p {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .topbar-status {
@@ -176,8 +206,8 @@ h1 {
 
 .icon-button {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: var(--icon-btn-md);
+  height: var(--icon-btn-md);
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
@@ -216,10 +246,10 @@ h1 {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  margin-top: 22px;
+  margin-top: 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px 12px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -252,7 +282,7 @@ h1 {
   display: block;
   overflow: hidden;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -279,11 +309,35 @@ h1 {
   color: var(--text);
 }
 
+.primary-action {
+  min-width: 138px;
+  border-color: color-mix(in srgb, var(--primary) 56%, var(--border));
+  background: color-mix(in srgb, var(--primary-soft) 38%, var(--surface));
+  color: var(--text);
+  font-weight: 680;
+}
+
 .primary-action:hover,
 .save-action:hover,
 .ghost-action:hover {
   border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
   background: color-mix(in srgb, var(--primary-soft) 30%, var(--surface));
+}
+
+.primary-action:hover {
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+  background: color-mix(in srgb, var(--primary-soft) 60%, var(--surface));
+}
+
+.primary-action.is-busy {
+  border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
+  background: color-mix(in srgb, var(--primary-soft) 48%, var(--surface));
+}
+
+.primary-action:disabled {
+  border-color: var(--border);
+  background: var(--surface-subtle);
+  color: var(--faint);
 }
 
 .save-action {
@@ -314,7 +368,20 @@ h1 {
 }
 
 .toolbar {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  opacity: 0.9;
 }
 
 .action-modal {
@@ -355,8 +422,8 @@ h1 {
 .workspace {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
-  gap: 14px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .sidebar,
@@ -370,6 +437,7 @@ h1 {
 .sidebar {
   align-self: start;
   overflow: hidden;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
 }
 
 .sidebar-section {
@@ -396,8 +464,8 @@ h1 {
 }
 
 .section-heading-actions .icon-button {
-  width: 28px;
-  height: 28px;
+  width: var(--icon-btn-md);
+  height: var(--icon-btn-md);
 }
 
 .item-list {
@@ -428,6 +496,11 @@ h1 {
 .nav-item.selected {
   border-color: var(--border-strong);
   background: var(--surface-subtle);
+}
+
+.nav-item.active-env:not(.selected) {
+  border-color: color-mix(in srgb, var(--success) 38%, var(--border));
+  background: color-mix(in srgb, var(--success) 9%, var(--surface-subtle));
 }
 
 .nav-item strong,
@@ -473,7 +546,7 @@ input::placeholder {
 
 input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-soft) 80%, transparent);
 }
 
 select {
@@ -489,11 +562,12 @@ select {
 
 select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-soft) 80%, transparent);
 }
 
 .workbench {
   overflow: hidden;
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface-subtle));
 }
 
 .workbench-header {
@@ -502,7 +576,7 @@ select:focus {
   align-items: center;
   gap: 16px;
   border-bottom: 1px solid var(--border);
-  padding: 16px;
+  padding: 14px 16px;
 }
 
 .workbench-meta {
@@ -541,18 +615,32 @@ select:focus {
 th,
 td {
   border-bottom: 1px solid var(--border);
-  padding: 8px 10px;
+  padding: 10px 12px;
   text-align: left;
   vertical-align: middle;
   font-size: 13px;
 }
 
 th {
-  height: 36px;
+  height: 42px;
   background: var(--surface-subtle);
   color: var(--muted);
   font-size: 11px;
   font-weight: 720;
+}
+
+th:nth-child(1),
+td:nth-child(1) {
+  width: 42%;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 52%;
+}
+
+tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-subtle) 55%, transparent);
 }
 
 tr:last-child td {
@@ -572,13 +660,22 @@ tr:last-child td {
   background: var(--surface);
 }
 
+.cell-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-soft) 72%, transparent);
+}
+
 .mono {
   font-family: "Cascadia Mono", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 .row-actions {
-  width: 46px;
+  width: 42px;
   text-align: right;
+}
+
+.row-actions .icon-button {
+  width: var(--icon-btn-sm);
+  height: var(--icon-btn-sm);
 }
 
 .empty-table {
@@ -637,8 +734,8 @@ tr:last-child td {
 }
 
 .result-heading-actions .icon-button {
-  width: 28px;
-  height: 28px;
+  width: var(--icon-btn-md);
+  height: var(--icon-btn-md);
 }
 
 .result-heading h3 {
@@ -873,6 +970,11 @@ tr:last-child td {
 
   .toolbar {
     flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .toolbar-divider {
+    display: none;
   }
 }
 

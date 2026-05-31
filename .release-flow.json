@@ -1,6 +1,15 @@
 {
   "releaseProvider": "github",
   "versionStrategy": "patch",
+  "homebrewTap": {
+    "enabled": true,
+    "repo": "askairo/homebrew-clicky",
+    "formulaName": "clicky",
+    "macArtifactPattern": "_aarch64.dmg",
+    "appName": "Clicky",
+    "desc": "Cross-platform environment profile switcher for Spring Boot",
+    "homepage": "https://github.com/askairo/Clicky"
+  },
   "assetPatterns": [
     "src-tauri/target/release/bundle/nsis/*-setup.exe",
     "src-tauri/target/release/bundle/msi/*.msi",

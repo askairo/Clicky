@@ -1,27 +1,22 @@
 use crate::domain::{HookResult, HooksDef};
+use crate::domain::RuntimeCapabilities;
+use crate::service::env_apply;
 use std::process::Command;
 
-#[cfg(target_os = "windows")]
-use winreg::enums::HKEY_CURRENT_USER;
-#[cfg(target_os = "windows")]
-use winreg::RegKey;
-
-#[cfg(target_os = "windows")]
-pub fn apply_var_persistent_windows(key: &str, value: &str) -> Result<(), String> {
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let (env_key, _disp) = hkcu
-        .create_subkey("Environment")
-        .map_err(|e| format!("open HKCU\\Environment failed for '{}': {}", key, e))?;
-    env_key
-        .set_value(key, &value)
-        .map_err(|e| format!("write HKCU\\Environment\\{} failed: {}", key, e))?;
-    std::env::set_var(key, value);
-    Ok(())
+pub fn apply_var_persistent(key: &str, value: &str) -> Result<(), String> {
+    env_apply::apply_var_persistent(key, value)
 }
 
-#[cfg(not(target_os = "windows"))]
-pub fn apply_var_persistent_windows(_key: &str, _value: &str) -> Result<(), String> {
-    Err("persistent apply is not implemented for this OS yet".to_string())
+pub fn persist_shell_env_snapshot(items: &[(String, String)]) -> Result<Option<String>, String> {
+    env_apply::persist_shell_env_snapshot(items)
+}
+
+pub fn runtime_capabilities() -> RuntimeCapabilities {
+    env_apply::runtime_capabilities()
+}
+
+pub fn read_persistent_var(key: &str) -> Result<Option<String>, String> {
+    env_apply::read_persistent_var(key)
 }
 
 pub fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {

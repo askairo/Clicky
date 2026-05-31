@@ -70,8 +70,24 @@ pub struct ApplyResult {
     pub group: String,
     pub environment: String,
     pub mode: String,
+    pub summary: ApplySummary,
     pub variable_results: Vec<VariableApplyResult>,
     pub hook_results: Vec<HookResult>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApplySummary {
+    pub total: usize,
+    pub success: usize,
+    pub failed: usize,
+    pub changed: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RuntimeCapabilities {
+    pub platform: String,
+    pub apply_scope_hint: String,
+    pub shell_integration_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,4 +140,3 @@ pub struct ImportSummary {
     pub vars_overwritten: usize,
     pub vars_skipped: usize,
 }
-

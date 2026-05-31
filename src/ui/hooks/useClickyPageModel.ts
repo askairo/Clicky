@@ -21,6 +21,7 @@ import {
   deleteGroupFlow,
   exportFlow,
   importFlow,
+  loadRuntimeCapabilities,
   loadActiveEnvironments,
   loadDraftVariables,
   loadEnvironments,
@@ -56,6 +57,7 @@ export function useClickyPageModel() {
   const [selectedEnv, setSelectedEnv] = useState("");
   const [activeEnvs, setActiveEnvs] = useState<string[]>([]);
   const [status, setStatus] = useState("");
+  const [runtimeHint, setRuntimeHint] = useState("");
   const [busy, setBusy] = useState(false);
   const [revealSensitive, setRevealSensitive] = useState(false);
   const [draftVars, setDraftVars] = useState<EditableVar[]>([]);
@@ -97,6 +99,16 @@ export function useClickyPageModel() {
     refreshGroups().catch((e) => {
       if (!isBrowserPreviewRuntimeError(e)) setStatus(`加载失败：${e}`);
     });
+  }, []);
+
+  useEffect(() => {
+    loadRuntimeCapabilities()
+      .then((caps) => {
+        setRuntimeHint(caps.apply_scope_hint);
+      })
+      .catch((e) => {
+        if (!isBrowserPreviewRuntimeError(e)) setStatus(`读取平台能力失败：${e}`);
+      });
   }, []);
 
   useEffect(() => {
@@ -264,16 +276,14 @@ export function useClickyPageModel() {
     try {
       const result = await applyEnvFlow(selectedGroup, selectedEnv);
       await refreshActiveEnvs(selectedGroup);
-      const total = result.result.variable_results.length;
-      const applied = result.result.variable_results.filter((item) => item.applied).length;
-      const failed = total - applied;
-      const changed = result.result.variable_results.filter((item) => (item.before ?? "") !== (item.after ?? "")).length;
+      const { total, failed, changed } = result.result.summary;
       const target = `${selectedGroup}/${selectedEnv}`;
-      setStatus(
+      const baseMessage =
         failed === 0
           ? `已应用 ${target}：处理 ${total} 个，实际变更 ${changed} 个。`
-          : `已应用 ${target}：处理 ${total} 个，实际变更 ${changed} 个，失败 ${failed} 个。`,
-      );
+          : `已应用 ${target}：处理 ${total} 个，实际变更 ${changed} 个，失败 ${failed} 个。`;
+      const message = runtimeHint ? `${baseMessage}\n${runtimeHint}` : baseMessage;
+      setStatus(message);
     } catch (e) {
       setStatus(`应用失败：${e}`);
     } finally {
@@ -496,6 +506,7 @@ export function useClickyPageModel() {
     setSelectedEnv,
     activeEnvs,
     status,
+    runtimeHint,
     busy,
     revealSensitive,
     setRevealSensitive,
@@ -547,9 +558,3 @@ export function useClickyPageModel() {
     onActionModalConfirm,
   };
 }
-
-
-
-
-
-

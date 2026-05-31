@@ -9,6 +9,7 @@ import {
   exportConfig,
   getCurrentEnvSelection,
   getEnvironmentVariables,
+  getRuntimeCapabilities,
   importConfig,
   listEnvironments,
   listGroups,
@@ -32,6 +33,7 @@ import type {
   ImportConflictStrategy,
   ImportSummaryDto,
   ImportTargetMode,
+  RuntimeCapabilitiesDto,
 } from "../domain";
 
 export async function loadGroups(preferred: string | undefined, selectedGroup: string) {
@@ -98,10 +100,9 @@ export async function saveVarsFlow(selectedGroup: string, selectedEnv: string, d
 
 export async function applyEnvFlow(selectedGroup: string, selectedEnv: string) {
   const result = await applyEnvironment(selectedGroup, selectedEnv);
-  const okCount = result.variable_results.filter((x) => x.applied).length;
   return {
     result,
-    message: `已应用 ${result.group}/${result.environment}，成功 ${okCount}/${result.variable_results.length} 个变量。`,
+    message: `已应用 ${result.group}/${result.environment}，成功 ${result.summary.success}/${result.summary.total} 个变量。`,
   };
 }
 
@@ -191,6 +192,10 @@ export async function loadCurrentEnvSelection() {
   return getCurrentEnvSelection();
 }
 
+export async function loadRuntimeCapabilities(): Promise<RuntimeCapabilitiesDto> {
+  return getRuntimeCapabilities();
+}
+
 export async function syncFromCurrentSelection(
   onGroup: (group: string) => void,
   onEnv: (env: string) => void,
@@ -211,5 +216,3 @@ export async function syncFromCurrentSelection(
 }
 
 export type { ApplyResultDto, ImportSummaryDto };
-
-

@@ -6,6 +6,7 @@ import type {
   GroupSummary,
   ImportRequestDto,
   ImportSummaryDto,
+  RuntimeCapabilitiesDto,
 } from "../domain";
 
 export type EnvSelectionDto = { group: string; env: string };
@@ -72,4 +73,8 @@ export function importConfig(req: ImportRequestDto) {
 
 export function getCurrentEnvSelection() {
   return invoke<EnvSelectionDto | null>("get_current_env_selection");
+}
+
+export function getRuntimeCapabilities() {
+  return invoke<RuntimeCapabilitiesDto>("get_runtime_capabilities");
 }

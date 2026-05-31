@@ -73,7 +73,6 @@ function App() {
           {c.busy ? "正在应用..." : "立即应用"}
         </button>
       </section>
-
       <div className="workspace">
         <aside className="sidebar" aria-label="环境导航">
           <section className="sidebar-section">
@@ -341,8 +340,4 @@ function App() {
 }
 
 export default App;
-
-
-
-
 

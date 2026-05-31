@@ -32,16 +32,9 @@ fn apply_recent_env_by_index(app: &AppHandle, index: usize) {
             remember_recent_env(&state, &target.group, &target.env);
             tray_service::sync_tray_menu(app);
 
-            let total = result.variable_results.len();
-            let changed = result
-                .variable_results
-                .iter()
-                .filter(|item| item.before.as_deref().unwrap_or("") != item.after.as_str())
-                .count();
-
             let status = format!(
                 "已切换到 {}/{}：处理 {} 个，变更 {} 个。",
-                target.group, target.env, total, changed
+                target.group, target.env, result.summary.total, result.summary.changed
             );
             let _ = app.emit("tray-switch-status", status.clone());
             let _ = app.emit("tray-switched-env", target.clone());

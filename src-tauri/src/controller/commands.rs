@@ -1,6 +1,7 @@
 use crate::appservice;
 use crate::domain::{
     ApplyResult, EnvSummary, ExportRequest, ExportResult, GroupSummary, ImportRequest, ImportSummary,
+    RuntimeCapabilities,
 };
 use std::collections::HashMap;
 use tauri::AppHandle;
@@ -94,4 +95,9 @@ pub fn apply_environment(
 #[tauri::command]
 pub fn get_current_env_selection(state: State<'_, crate::AppRuntimeState>) -> Option<crate::EnvSelection> {
     crate::current_recent_env(&state)
+}
+
+#[tauri::command]
+pub fn get_runtime_capabilities() -> RuntimeCapabilities {
+    appservice::get_runtime_capabilities()
 }

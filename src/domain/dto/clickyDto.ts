@@ -4,6 +4,12 @@ export type ApplyResultDto = {
   group: string;
   environment: string;
   mode: "persistent";
+  summary: {
+    total: number;
+    success: number;
+    failed: number;
+    changed: number;
+  };
   variable_results: VariableApplyResult[];
   hook_results: HookResult[];
 };
@@ -34,4 +40,10 @@ export type ImportRequestDto = {
   target_group: string | null;
   conflict_strategy: ImportConflictStrategy;
   dry_run: boolean;
+};
+
+export type RuntimeCapabilitiesDto = {
+  platform: string;
+  apply_scope_hint: string;
+  shell_integration_file: string | null;
 };

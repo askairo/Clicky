@@ -159,10 +159,13 @@ pub fn detect_active_environments(group_name: String) -> Result<Vec<String>, Str
 
     let mut matches = Vec::new();
     for (env_name, env_def) in &group.environments {
-        let all_match = env_def
-            .variables
-            .iter()
-            .all(|(k, v)| std::env::var(k).map(|current| current == *v).unwrap_or(false));
+        let all_match = env_def.variables.iter().all(|(k, v)| {
+            system_service::read_persistent_var(k)
+                .ok()
+                .flatten()
+                .map(|current| current == *v)
+                .unwrap_or(false)
+        });
         if all_match {
             matches.push(env_name.clone());
         }
@@ -305,10 +308,14 @@ pub fn apply_environment_flow(group_name: String, env_name: String, mode: String
     let mut variable_results = Vec::new();
     let mut entries = env.variables.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
+    let shell_items = entries
+        .iter()
+        .map(|(k, v)| ((*k).clone(), (*v).clone()))
+        .collect::<Vec<_>>();
 
     for (k, v) in entries {
         let before = std::env::var(k).ok();
-        let result = match system_service::apply_var_persistent_windows(k, v) {
+        let result = match system_service::apply_var_persistent(k, v) {
             Ok(_) => VariableApplyResult {
                 key: k.clone(),
                 before,
@@ -327,15 +334,40 @@ pub fn apply_environment_flow(group_name: String, env_name: String, mode: String
         variable_results.push(result);
     }
 
+    if let Ok(Some(path)) = system_service::persist_shell_env_snapshot(&shell_items) {
+        eprintln!("shell integration file updated: {}", path);
+    }
+
     let hook_results = system_service::run_post_hooks(env.hooks.as_ref());
+    let summary = build_apply_summary(&variable_results);
 
     Ok(ApplyResult {
         group: group_name,
         environment: env_name,
         mode,
+        summary,
         variable_results,
         hook_results,
     })
+}
+
+pub fn get_runtime_capabilities() -> RuntimeCapabilities {
+    system_service::runtime_capabilities()
+}
+
+fn build_apply_summary(results: &[VariableApplyResult]) -> ApplySummary {
+    let total = results.len();
+    let success = results.iter().filter(|item| item.applied).count();
+    let changed = results
+        .iter()
+        .filter(|item| item.before.as_deref().unwrap_or("") != item.after.as_str())
+        .count();
+    ApplySummary {
+        total,
+        success,
+        failed: total.saturating_sub(success),
+        changed,
+    }
 }
 
 fn validate_group_variable_uniqueness(cfg: &ConfigFile) -> Result<(), String> {

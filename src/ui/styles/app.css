@@ -288,6 +288,7 @@ h1 {
   white-space: nowrap;
 }
 
+
 .primary-action,
 .save-action,
 .ghost-action {
@@ -790,6 +791,7 @@ tr:last-child td {
   padding: 11px 13px;
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-line;
 }
 
 .modal-backdrop {

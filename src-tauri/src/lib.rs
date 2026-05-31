@@ -160,7 +160,8 @@ pub fn run() {
             controller::commands::detect_active_environments,
             controller::commands::save_environment_variables,
             controller::commands::apply_environment,
-            controller::commands::get_current_env_selection
+            controller::commands::get_current_env_selection,
+            controller::commands::get_runtime_capabilities
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

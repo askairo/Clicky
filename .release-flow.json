@@ -1,0 +1,10 @@
+{
+  "releaseProvider": "github",
+  "versionStrategy": "patch",
+  "assetPatterns": [
+    "src-tauri/target/release/bundle/nsis/*-setup.exe",
+    "src-tauri/target/release/bundle/msi/*.msi",
+    "src-tauri/target/release/bundle/dmg/*.dmg"
+  ],
+  "removeUnversionedAssets": true
+}

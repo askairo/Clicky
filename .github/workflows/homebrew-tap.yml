@@ -18,8 +18,8 @@ jobs:
       github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     runs-on: ubuntu-latest
     env:
-      TAP_REPO: askairo/homebrew-clicky
-      FORMULA_NAME: clicky
+      TAP_REPO: askairo/homebrew-tap
+      CASK_NAME: clicky
       APP_NAME: Clicky
       APP_DESC: Cross-platform environment profile switcher for Spring Boot
       APP_HOMEPAGE: https://github.com/askairo/Clicky
@@ -58,17 +58,17 @@ jobs:
       - name: Checkout source repo
         uses: actions/checkout@v4
 
-      - name: Generate formula
+      - name: Generate cask
         run: |
-          chmod +x scripts/generate-homebrew-formula.sh
-          scripts/generate-homebrew-formula.sh \
+          chmod +x scripts/generate-homebrew-cask.sh
+          scripts/generate-homebrew-cask.sh \
             "${{ steps.version.outputs.version }}" \
             "${{ steps.digest.outputs.sha256 }}" \
             "${{ steps.asset.outputs.asset_url }}" \
             "${APP_HOMEPAGE}" \
             "${APP_DESC}" \
-            "${FORMULA_NAME}" \
-            "${APP_NAME}" > clicky.rb
+            "${APP_NAME}" \
+            "${CASK_NAME}" > clicky.rb
 
       - name: Checkout tap repo
         uses: actions/checkout@v4
@@ -77,17 +77,17 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
-      - name: Update formula in tap repo
+      - name: Update cask in tap repo
         run: |
-          mkdir -p tap/Formula
-          cp clicky.rb "tap/Formula/${FORMULA_NAME}.rb"
+          mkdir -p tap/Casks
+          cp clicky.rb "tap/Casks/${CASK_NAME}.rb"
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git diff --quiet; then
-            echo "No changes in formula, skip commit."
+            echo "No changes in cask, skip commit."
             exit 0
           fi
-          git add "Formula/${FORMULA_NAME}.rb"
-          git commit -m "chore: update ${FORMULA_NAME} to v${{ steps.version.outputs.version }}"
+          git add "Casks/${CASK_NAME}.rb"
+          git commit -m "chore: update ${CASK_NAME} to v${{ steps.version.outputs.version }}"
           git push

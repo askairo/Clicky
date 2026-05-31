@@ -3,8 +3,8 @@
   "versionStrategy": "patch",
   "homebrewTap": {
     "enabled": true,
-    "repo": "askairo/homebrew-clicky",
-    "formulaName": "clicky",
+    "repo": "askairo/homebrew-tap",
+    "caskName": "clicky",
     "macArtifactPattern": "_aarch64.dmg",
     "appName": "Clicky",
     "desc": "Cross-platform environment profile switcher for Spring Boot",

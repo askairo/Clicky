@@ -3,6 +3,7 @@ use crate::domain::{
     ApplyResult, EnvSummary, ExportRequest, ExportResult, GroupSummary, ImportRequest, ImportSummary,
 };
 use std::collections::HashMap;
+use tauri::AppHandle;
 use tauri::State;
 
 #[tauri::command]
@@ -79,11 +80,18 @@ pub fn apply_environment(
     group_name: String,
     env_name: String,
     mode: String,
+    app: AppHandle,
     state: State<'_, crate::AppRuntimeState>,
 ) -> Result<ApplyResult, String> {
     let result = appservice::apply_environment_flow(group_name.clone(), env_name.clone(), mode);
     if result.is_ok() {
         crate::remember_recent_env(&state, &group_name, &env_name);
+        crate::service::tray_service::sync_tray_menu(&app);
     }
     result
+}
+
+#[tauri::command]
+pub fn get_current_env_selection(state: State<'_, crate::AppRuntimeState>) -> Option<crate::EnvSelection> {
+    crate::current_recent_env(&state)
 }

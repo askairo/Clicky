@@ -29,6 +29,7 @@ import {
   renameEnvFlow,
   renameGroupFlow,
   saveVarsFlow,
+  syncFromCurrentSelection,
 } from "../../appservice/clickyAppService";
 import { isBrowserPreviewRuntimeError } from "../../utils/clickyHelpers";
 
@@ -126,18 +127,46 @@ export function useClickyPageModel() {
   }, [status]);
 
   useEffect(() => {
-    let unlisten: undefined | (() => void);
+    let unlistenStatus: undefined | (() => void);
+    let unlistenSwitched: undefined | (() => void);
     listen<string>("tray-switch-status", (event) => {
       setStatus(event.payload);
+      syncFromCurrentSelection(setSelectedGroup, setSelectedEnv, {
+        groups: refreshGroups,
+        envs: refreshEnvs,
+        activeEnvs: refreshActiveEnvs,
+      }).catch((e) => {
+        if (!isBrowserPreviewRuntimeError(e)) setStatus(`同步托盘状态失败：${e}`);
+      });
     })
       .then((dispose) => {
-        unlisten = dispose;
+        unlistenStatus = dispose;
+      })
+      .catch(() => {
+        // Browser preview has no tauri bridge.
+      });
+
+    listen<{ group: string; env: string }>("tray-switched-env", (event) => {
+      const { group, env } = event.payload;
+      (async () => {
+        setSelectedGroup(group);
+        setSelectedEnv(env);
+        await refreshGroups(group);
+        await refreshEnvs(group, env);
+        await refreshActiveEnvs(group);
+      })().catch((e) => {
+        if (!isBrowserPreviewRuntimeError(e)) setStatus(`同步托盘状态失败：${e}`);
+      });
+    })
+      .then((dispose) => {
+        unlistenSwitched = dispose;
       })
       .catch(() => {
         // Browser preview has no tauri bridge.
       });
     return () => {
-      unlisten?.();
+      unlistenStatus?.();
+      unlistenSwitched?.();
     };
   }, []);
 
@@ -346,7 +375,7 @@ export function useClickyPageModel() {
   const onCreateEnvModal = async () => {
     setActionModal({
       title: "新建环境",
-      description: "请输入环境名称。",
+      description: "请输入环境名称。将自动复制同分组下已有变量 Key（值留空）。",
       confirmLabel: "创建",
       primaryLabel: "环境名称",
       primaryPlaceholder: "例如 dev / sit / prod",
@@ -358,7 +387,7 @@ export function useClickyPageModel() {
   const onAddRowModal = () => {
     setActionModal({
       title: "新增变量",
-      description: "请输入变量名和值。",
+      description: "新增后会同步到同分组其他环境（仅同步 Key，其他环境值默认为空）。",
       confirmLabel: "添加",
       primaryLabel: "变量名",
       primaryPlaceholder: "例如 MYSQL_HOST",

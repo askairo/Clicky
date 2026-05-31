@@ -8,6 +8,8 @@ import type {
   ImportSummaryDto,
 } from "../domain";
 
+export type EnvSelectionDto = { group: string; env: string };
+
 export function listGroups() {
   return invoke<GroupSummary[]>("list_groups");
 }
@@ -66,4 +68,8 @@ export function previewImportConfig(req: ImportRequestDto) {
 
 export function importConfig(req: ImportRequestDto) {
   return invoke<ImportSummaryDto>("import_config", { req });
+}
+
+export function getCurrentEnvSelection() {
+  return invoke<EnvSelectionDto | null>("get_current_env_selection");
 }

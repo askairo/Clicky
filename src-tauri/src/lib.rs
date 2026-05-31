@@ -1,4 +1,4 @@
-mod appservice;
+﻿mod appservice;
 mod controller;
 mod domain;
 mod service;
@@ -9,12 +9,9 @@ use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
-use tauri_plugin_notification::NotificationExt;
+use tauri::{Manager, WindowEvent};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EnvSelection {
     pub group: String,
     pub env: String,
@@ -34,7 +31,7 @@ impl AppRuntimeState {
         Ok(base.join("recent_envs.json"))
     }
 
-    fn load_from_disk(&self) -> Result<(), String> {
+    pub(crate) fn load_from_disk(&self) -> Result<(), String> {
         let path = Self::recent_file_path()?;
         if !path.exists() {
             return Ok(());
@@ -55,8 +52,13 @@ impl AppRuntimeState {
     fn save_to_disk(&self) -> Result<(), String> {
         let path = Self::recent_file_path()?;
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("failed to create recent env directory {}: {}", parent.display(), e))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "failed to create recent env directory {}: {}",
+                    parent.display(),
+                    e
+                )
+            })?;
         }
         let recent = self.recent.lock().expect("recent selections lock poisoned");
         let snapshot = recent.iter().take(2).cloned().collect::<Vec<_>>();
@@ -80,27 +82,23 @@ impl AppRuntimeState {
         let _ = self.save_to_disk();
     }
 
-    fn switch_target(&self) -> Option<EnvSelection> {
+    pub(crate) fn recent_at(&self, index: usize) -> Option<EnvSelection> {
         let recent = self.recent.lock().expect("recent selections lock poisoned");
-        if recent.len() < 2 {
-            return None;
-        }
-        recent.get(1).cloned()
+        recent.get(index).cloned()
     }
 
+    pub(crate) fn recent_snapshot(&self) -> Vec<EnvSelection> {
+        let recent = self.recent.lock().expect("recent selections lock poisoned");
+        recent.iter().take(2).cloned().collect()
+    }
 }
 
 pub fn remember_recent_env(state: &AppRuntimeState, group: &str, env: &str) {
     state.remember(group, env);
 }
 
-fn notify(app: &AppHandle, body: &str) {
-    let _ = app
-        .notification()
-        .builder()
-        .title("Clicky")
-        .body(body)
-        .show();
+pub fn current_recent_env(state: &AppRuntimeState) -> Option<EnvSelection> {
+    state.recent_at(0)
 }
 
 fn init_storage() -> Result<(), String> {
@@ -121,61 +119,6 @@ fn init_storage() -> Result<(), String> {
     Ok(())
 }
 
-fn show_main_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
-}
-
-fn switch_recent_env(app: &AppHandle) {
-    let state = app.state::<AppRuntimeState>();
-    let Some(target) = state.switch_target() else {
-        let msg = "请先应用最近用过的两个环境。";
-        let _ = app.emit("tray-switch-status", msg);
-        notify(app, msg);
-        return;
-    };
-
-    let applied = appservice::apply_environment_flow(
-        target.group.clone(),
-        target.env.clone(),
-        "persistent".to_string(),
-    );
-
-    match applied {
-        Ok(result) => {
-            remember_recent_env(&state, &target.group, &target.env);
-            let total = result.variable_results.len();
-            let changed = result
-                .variable_results
-                .iter()
-                .filter(|item| item.before.as_deref().unwrap_or("") != item.after.as_str())
-                .count();
-            let _ = app.emit(
-                "tray-switch-status",
-                format!(
-                    "托盘已切换到 {}/{}：处理 {} 个，实际变更 {} 个。",
-                    target.group, target.env, total, changed
-                ),
-            );
-            notify(
-                app,
-                &format!(
-                    "已切换到 {}/{}：处理 {} 个，实际变更 {} 个。",
-                    target.group, target.env, total, changed
-                ),
-            );
-        }
-        Err(err) => {
-            let msg = format!("托盘切换失败：{}", err);
-            let _ = app.emit("tray-switch-status", msg.clone());
-            notify(app, &msg);
-        }
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if let Err(e) = init_storage() {
@@ -190,28 +133,7 @@ pub fn run() {
         .setup(|app| {
             let state = app.state::<AppRuntimeState>();
             let _ = state.load_from_disk();
-
-            let open_item = MenuItem::with_id(app, "open", "打开 Clicky", true, None::<&str>)?;
-            let switch_item = MenuItem::with_id(app, "switch_recent", "切换最近环境", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&open_item, &switch_item, &quit_item])?;
-
-            let mut tray_builder = TrayIconBuilder::new()
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(move |tray, event| match event.id.as_ref() {
-                    "open" => show_main_window(tray.app_handle()),
-                    "quit" => tray.app_handle().exit(0),
-                    "switch_recent" => switch_recent_env(tray.app_handle()),
-                    _ => {}
-                });
-
-            if let Some(icon) = app.default_window_icon() {
-                tray_builder = tray_builder.icon(icon.clone());
-            }
-
-            tray_builder.build(app)?;
-
+            service::tray_service::setup_tray(app)?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -237,7 +159,8 @@ pub fn run() {
             controller::commands::get_environment_variables,
             controller::commands::detect_active_environments,
             controller::commands::save_environment_variables,
-            controller::commands::apply_environment
+            controller::commands::apply_environment,
+            controller::commands::get_current_env_selection
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

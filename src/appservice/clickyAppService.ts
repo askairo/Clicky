@@ -7,6 +7,7 @@ import {
   deleteGroup,
   detectActiveEnvironments,
   exportConfig,
+  getCurrentEnvSelection,
   getEnvironmentVariables,
   importConfig,
   listEnvironments,
@@ -184,6 +185,29 @@ export async function previewImportFlow(req: ReturnType<typeof buildImportReq>) 
 export async function importFlow(req: ReturnType<typeof buildImportReq>) {
   const summary = await importConfig(req);
   return { summary, message: "导入完成。" };
+}
+
+export async function loadCurrentEnvSelection() {
+  return getCurrentEnvSelection();
+}
+
+export async function syncFromCurrentSelection(
+  onGroup: (group: string) => void,
+  onEnv: (env: string) => void,
+  refresh: {
+    groups: (preferred?: string) => Promise<void>;
+    envs: (groupName: string, preferred?: string) => Promise<void>;
+    activeEnvs: (groupName: string) => Promise<void>;
+  },
+) {
+  const current = await loadCurrentEnvSelection();
+  if (!current) return { ok: false as const };
+  onGroup(current.group);
+  onEnv(current.env);
+  await refresh.groups(current.group);
+  await refresh.envs(current.group, current.env);
+  await refresh.activeEnvs(current.group);
+  return { ok: true as const, current };
 }
 
 export type { ApplyResultDto, ImportSummaryDto };

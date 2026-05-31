@@ -198,8 +198,28 @@ pub fn save_environment_variables(
     };
 
     existing_group.environments.insert(env_name, updated_env);
+    normalize_group_variable_keys(existing_group);
     validate_group_variable_uniqueness(&cfg)?;
     storage_service::save_config(&cfg)
+}
+
+fn normalize_group_variable_keys(group: &mut GroupDef) {
+    let mut key_set: HashSet<String> = HashSet::new();
+    for env in group.environments.values() {
+        for key in env.variables.keys() {
+            key_set.insert(key.clone());
+        }
+    }
+
+    if key_set.is_empty() {
+        return;
+    }
+
+    for env in group.environments.values_mut() {
+        for key in &key_set {
+            env.variables.entry(key.clone()).or_insert_with(String::new);
+        }
+    }
 }
 
 pub fn export_config_flow(req: ExportRequest) -> Result<ExportResult, String> {

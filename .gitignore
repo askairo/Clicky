@@ -32,3 +32,6 @@ config/environments.db-wal
 # Local dev runtime logs
 .codex-tauri-dev.out.log
 .codex-tauri-dev.err.log
+
+# Local test/browser automation artifacts
+.playwright-mcp/

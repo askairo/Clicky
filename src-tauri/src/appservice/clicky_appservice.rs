@@ -314,7 +314,7 @@ pub fn apply_environment_flow(group_name: String, env_name: String, mode: String
         .collect::<Vec<_>>();
 
     for (k, v) in entries {
-        let before = std::env::var(k).ok();
+        let before = system_service::read_persistent_var(k).ok().flatten();
         let result = match system_service::apply_var_persistent(k, v) {
             Ok(_) => VariableApplyResult {
                 key: k.clone(),

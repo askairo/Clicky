@@ -1,6 +1,9 @@
-use crate::service::env_apply::EnvApplier;
 use crate::domain::RuntimeCapabilities;
+use crate::service::env_apply::EnvApplier;
 
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+};
 use winreg::enums::HKEY_CURRENT_USER;
 use winreg::RegKey;
 
@@ -17,10 +20,14 @@ impl EnvApplier for WindowsEnvApplier {
             .set_value(key, &value)
             .map_err(|e| format!("write HKCU\\Environment\\{} failed: {}", key, e))?;
         std::env::set_var(key, value);
+        broadcast_environment_change()?;
         Ok(())
     }
 
-    fn persist_shell_env_snapshot(&self, _items: &[(String, String)]) -> Result<Option<String>, String> {
+    fn persist_shell_env_snapshot(
+        &self,
+        _items: &[(String, String)],
+    ) -> Result<Option<String>, String> {
         Ok(None)
     }
 
@@ -42,4 +49,32 @@ impl EnvApplier for WindowsEnvApplier {
             Err(_) => Ok(None),
         }
     }
+}
+
+fn broadcast_environment_change() -> Result<(), String> {
+    let environment = "Environment"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<u16>>();
+    let mut result = 0usize;
+    let sent = unsafe {
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            environment.as_ptr() as isize,
+            SMTO_ABORTIFHUNG,
+            5000,
+            &mut result,
+        )
+    };
+
+    if sent == 0 {
+        return Err(
+            "persisted environment variable, but failed to notify Windows environment change"
+                .to_string(),
+        );
+    }
+
+    Ok(())
 }

@@ -24,5 +24,6 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.55"
 

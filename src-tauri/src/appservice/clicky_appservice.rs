@@ -73,7 +73,11 @@ pub fn delete_group(group_name: String) -> Result<(), String> {
     storage_service::save_config(&cfg)
 }
 
-pub fn rename_environment(group_name: String, old_name: String, new_name: String) -> Result<(), String> {
+pub fn rename_environment(
+    group_name: String,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
     let mut cfg = storage_service::load_config()?;
     let group = cfg
         .groups
@@ -88,13 +92,22 @@ pub fn rename_environment(group_name: String, old_name: String, new_name: String
         return Ok(());
     }
     if !group.environments.contains_key(old_name) {
-        return Err(format!("environment '{}' not found in group '{}'", old_name, group_name));
+        return Err(format!(
+            "environment '{}' not found in group '{}'",
+            old_name, group_name
+        ));
     }
     if group.environments.contains_key(new_name) {
-        return Err(format!("environment '{}' already exists in group '{}'", new_name, group_name));
+        return Err(format!(
+            "environment '{}' already exists in group '{}'",
+            new_name, group_name
+        ));
     }
     let Some(env) = group.environments.remove(old_name) else {
-        return Err(format!("environment '{}' not found in group '{}'", old_name, group_name));
+        return Err(format!(
+            "environment '{}' not found in group '{}'",
+            old_name, group_name
+        ));
     };
     group.environments.insert(new_name.to_string(), env);
     storage_service::save_config(&cfg)
@@ -111,7 +124,10 @@ pub fn delete_environment(group_name: String, env_name: String) -> Result<(), St
         return Err("environment name is required".to_string());
     }
     if group.environments.remove(name).is_none() {
-        return Err(format!("environment '{}' not found in group '{}'", name, group_name));
+        return Err(format!(
+            "environment '{}' not found in group '{}'",
+            name, group_name
+        ));
     }
     storage_service::save_config(&cfg)
 }
@@ -137,7 +153,10 @@ pub fn list_environments(group_name: String) -> Result<Vec<EnvSummary>, String> 
     Ok(list)
 }
 
-pub fn get_environment_variables(group_name: String, env_name: String) -> Result<HashMap<String, String>, String> {
+pub fn get_environment_variables(
+    group_name: String,
+    env_name: String,
+) -> Result<HashMap<String, String>, String> {
     let cfg = storage_service::load_config()?;
     let group = cfg
         .groups
@@ -147,7 +166,12 @@ pub fn get_environment_variables(group_name: String, env_name: String) -> Result
         .environments
         .get(&env_name)
         .map(|e| e.variables.clone())
-        .ok_or_else(|| format!("environment '{}' not found in group '{}'", env_name, group_name))
+        .ok_or_else(|| {
+            format!(
+                "environment '{}' not found in group '{}'",
+                env_name, group_name
+            )
+        })
 }
 
 pub fn detect_active_environments(group_name: String) -> Result<Vec<String>, String> {
@@ -228,15 +252,21 @@ fn normalize_group_variable_keys(group: &mut GroupDef) {
 pub fn export_config_flow(req: ExportRequest) -> Result<ExportResult, String> {
     let cfg = storage_service::load_config()?;
     let subset = export_subset(&cfg, &req.group_names)?;
-    let content =
-        serde_yaml::to_string(&subset).map_err(|e| format!("failed to serialize export yaml: {}", e))?;
+    let content = serde_yaml::to_string(&subset)
+        .map_err(|e| format!("failed to serialize export yaml: {}", e))?;
 
     let path = PathBuf::from(req.output_path.clone());
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create export directory {}: {}", parent.display(), e))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create export directory {}: {}",
+                parent.display(),
+                e
+            )
+        })?;
     }
-    fs::write(&path, content).map_err(|e| format!("failed to write export file {}: {}", path.display(), e))?;
+    fs::write(&path, content)
+        .map_err(|e| format!("failed to write export file {}: {}", path.display(), e))?;
 
     let (groups, environments, variables) = config_counts(&subset);
     Ok(ExportResult {
@@ -290,19 +320,28 @@ pub fn import_config_flow(req: ImportRequest) -> Result<ImportSummary, String> {
     Ok(summary)
 }
 
-pub fn apply_environment_flow(group_name: String, env_name: String, mode: String) -> Result<ApplyResult, String> {
+pub fn apply_environment_flow(
+    group_name: String,
+    env_name: String,
+    mode: String,
+) -> Result<ApplyResult, String> {
     let cfg = storage_service::load_config()?;
     let group = cfg
         .groups
         .get(&group_name)
         .ok_or_else(|| format!("group '{}' not found", group_name))?;
-    let env = group
-        .environments
-        .get(&env_name)
-        .ok_or_else(|| format!("environment '{}' not found in group '{}'", env_name, group_name))?;
+    let env = group.environments.get(&env_name).ok_or_else(|| {
+        format!(
+            "environment '{}' not found in group '{}'",
+            env_name, group_name
+        )
+    })?;
 
     if mode != "persistent" {
-        return Err("Clicky only supports persistent mode; reopen target processes after applying".to_string());
+        return Err(
+            "Clicky only supports persistent mode; reopen target processes after applying"
+                .to_string(),
+        );
     }
 
     let mut variable_results = Vec::new();
@@ -442,7 +481,9 @@ fn merge_import(
     for (group_name, group) in &base.groups {
         for env in group.environments.values() {
             for key in env.variables.keys() {
-                key_owner.entry(key.clone()).or_insert_with(|| group_name.clone());
+                key_owner
+                    .entry(key.clone())
+                    .or_insert_with(|| group_name.clone());
             }
         }
     }
@@ -474,6 +515,10 @@ fn merge_import(
                                 .environments
                                 .insert(src_env_name.clone(), src_env.clone());
                             summary.envs_added += 1;
+                            summary.vars_added += src_env.variables.len();
+                            for key in src_env.variables.keys() {
+                                key_owner.insert(key.clone(), dst_group_name.clone());
+                            }
                             continue;
                         }
 
@@ -496,7 +541,8 @@ fn merge_import(
                                     summary.vars_added += 1;
                                 }
                                 Some(_) => match strategy {
-                                    ImportConflictStrategy::SkipExisting | ImportConflictStrategy::OnlyAddNew => {
+                                    ImportConflictStrategy::SkipExisting
+                                    | ImportConflictStrategy::OnlyAddNew => {
                                         summary.vars_skipped += 1;
                                     }
                                     ImportConflictStrategy::OverwriteExisting => {
@@ -542,6 +588,10 @@ fn merge_import(
                             .environments
                             .insert(src_env_name.clone(), src_env.clone());
                         summary.envs_added += 1;
+                        summary.vars_added += src_env.variables.len();
+                        for key in src_env.variables.keys() {
+                            key_owner.insert(key.clone(), target.clone());
+                        }
                         continue;
                     }
 
@@ -564,7 +614,8 @@ fn merge_import(
                                 summary.vars_added += 1;
                             }
                             Some(_) => match strategy {
-                                ImportConflictStrategy::SkipExisting | ImportConflictStrategy::OnlyAddNew => {
+                                ImportConflictStrategy::SkipExisting
+                                | ImportConflictStrategy::OnlyAddNew => {
                                     summary.vars_skipped += 1;
                                 }
                                 ImportConflictStrategy::OverwriteExisting => {
@@ -580,4 +631,281 @@ fn merge_import(
     }
 
     Ok(summary)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEST_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+        TEST_MUTEX
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before UNIX_EPOCH")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "clicky-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            stamp
+        ))
+    }
+
+    struct DataDirGuard {
+        path: PathBuf,
+        old_home: Option<std::ffi::OsString>,
+        old_userprofile: Option<std::ffi::OsString>,
+    }
+
+    impl DataDirGuard {
+        fn new(prefix: &str) -> Self {
+            let path = unique_temp_dir(prefix);
+            fs::create_dir_all(&path).expect("create temp data dir");
+            let old_home = std::env::var_os("HOME");
+            let old_userprofile = std::env::var_os("USERPROFILE");
+            std::env::set_var("HOME", &path);
+            std::env::set_var("USERPROFILE", &path);
+            Self {
+                path,
+                old_home,
+                old_userprofile,
+            }
+        }
+    }
+
+    impl Drop for DataDirGuard {
+        fn drop(&mut self) {
+            match &self.old_home {
+                Some(value) => std::env::set_var("HOME", value),
+                None => std::env::remove_var("HOME"),
+            }
+            match &self.old_userprofile {
+                Some(value) => std::env::set_var("USERPROFILE", value),
+                None => std::env::remove_var("USERPROFILE"),
+            }
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn sample_config() -> ConfigFile {
+        let mut variables = HashMap::new();
+        variables.insert(
+            "CLICKY_TEST_API_URL".to_string(),
+            "https://dev.example".to_string(),
+        );
+        variables.insert("CLICKY_TEST_TOKEN".to_string(), "token-123".to_string());
+
+        let mut environments = HashMap::new();
+        environments.insert(
+            "dev".to_string(),
+            EnvDef {
+                description: Some("development".to_string()),
+                variables,
+                hooks: Some(HooksDef {
+                    post: Some(vec!["echo Clicky hook".to_string()]),
+                }),
+            },
+        );
+
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_string(),
+            GroupDef {
+                description: Some("default group".to_string()),
+                environments,
+            },
+        );
+
+        ConfigFile {
+            groups,
+            environments: HashMap::new(),
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn remove_registry_env_value(key: &str) {
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(env_key) = hkcu.open_subkey_with_flags("Environment", KEY_WRITE) {
+            let _ = env_key.delete_value(key);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn cleanup_registry_values(keys: &[String]) {
+        for key in keys {
+            remove_registry_env_value(key);
+        }
+    }
+
+    #[test]
+    fn acceptance_export_import_roundtrip() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("export-import");
+
+        let config = sample_config();
+        storage_service::save_config(&config).expect("save initial config");
+
+        let export_path = unique_temp_dir("export-file").with_extension("yaml");
+        let export_result = export_config_flow(ExportRequest {
+            output_path: export_path.display().to_string(),
+            group_names: vec!["default".to_string()],
+        })
+        .expect("export config");
+        assert_eq!(export_result.groups, 1);
+        assert_eq!(export_result.environments, 1);
+        assert_eq!(export_result.variables, 2);
+
+        let exported = fs::read_to_string(&export_path).expect("read exported yaml");
+        assert!(exported.contains("default"));
+        assert!(exported.contains("CLICKY_TEST_API_URL"));
+
+        storage_service::save_config(&ConfigFile {
+            groups: HashMap::new(),
+            environments: HashMap::new(),
+        })
+        .expect("reset db");
+
+        let preview = preview_import_config_flow(ImportRequest {
+            input_path: export_path.display().to_string(),
+            target_mode: ImportTargetMode::KeepGroups,
+            target_group: None,
+            conflict_strategy: ImportConflictStrategy::SkipExisting,
+            dry_run: true,
+        })
+        .expect("preview import");
+        assert_eq!(preview.groups_added, 1);
+        assert_eq!(preview.envs_added, 1);
+        assert_eq!(preview.vars_added, 2);
+
+        let imported = import_config_flow(ImportRequest {
+            input_path: export_path.display().to_string(),
+            target_mode: ImportTargetMode::KeepGroups,
+            target_group: None,
+            conflict_strategy: ImportConflictStrategy::SkipExisting,
+            dry_run: false,
+        })
+        .expect("import config");
+        assert_eq!(imported.groups_added, 1);
+        assert_eq!(imported.envs_added, 1);
+        assert_eq!(imported.vars_added, 2);
+
+        let groups = list_groups().expect("list groups");
+        assert_eq!(groups.len(), 1);
+        let envs = list_environments("default".to_string()).expect("list envs");
+        assert_eq!(envs.len(), 1);
+        let vars =
+            get_environment_variables("default".to_string(), "dev".to_string()).expect("get vars");
+        assert_eq!(
+            vars.get("CLICKY_TEST_API_URL"),
+            Some(&"https://dev.example".to_string())
+        );
+        assert_eq!(
+            vars.get("CLICKY_TEST_TOKEN"),
+            Some(&"token-123".to_string())
+        );
+
+        let _ = fs::remove_file(&export_path);
+    }
+
+    #[test]
+    fn acceptance_hooks_run_and_report() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("hooks");
+
+        let config = sample_config();
+        storage_service::save_config(&config).expect("save config");
+
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply config");
+
+        assert_eq!(result.summary.total, 2);
+        assert_eq!(result.summary.success, 2);
+        assert_eq!(result.summary.failed, 0);
+        assert_eq!(result.hook_results.len(), 1);
+        assert!(result.hook_results[0].success);
+        assert!(result.hook_results[0].message.contains("Clicky hook"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn acceptance_windows_apply_and_detect() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("windows-apply");
+
+        let key = format!("CLICKY_TEST_ENV_{}_A", std::process::id());
+        let value = format!("value-{}", unique_temp_dir("windows-key").display());
+        cleanup_registry_values(std::slice::from_ref(&key));
+        std::env::remove_var(&key);
+
+        let mut variables = HashMap::new();
+        variables.insert(key.clone(), value.clone());
+
+        let mut environments = HashMap::new();
+        environments.insert(
+            "sit".to_string(),
+            EnvDef {
+                description: Some("system integration test".to_string()),
+                variables,
+                hooks: None,
+            },
+        );
+
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_string(),
+            GroupDef {
+                description: Some("default group".to_string()),
+                environments,
+            },
+        );
+
+        storage_service::save_config(&ConfigFile {
+            groups,
+            environments: HashMap::new(),
+        })
+        .expect("save config");
+
+        let before =
+            detect_active_environments("default".to_string()).expect("detect before apply");
+        assert!(before.is_empty());
+
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "sit".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply config");
+        assert_eq!(result.summary.total, 1);
+        assert_eq!(result.summary.success, 1);
+
+        let active = detect_active_environments("default".to_string()).expect("detect after apply");
+        assert_eq!(active, vec!["sit".to_string()]);
+
+        let capabilities = get_runtime_capabilities();
+        assert_eq!(capabilities.platform, "windows");
+        assert!(capabilities.apply_scope_hint.contains("新开进程"));
+
+        cleanup_registry_values(std::slice::from_ref(&key));
+        std::env::remove_var(&key);
+    }
 }

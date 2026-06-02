@@ -57,6 +57,12 @@ open /Applications/Clicky.app
 
 环境变量切换对“新进程”生效。已有终端、IDE、目标程序通常需要重启后才能读取到最新值。
 
+### 相关文档
+
+- 平台差异与常见问题：`docs/platform-differences.md`
+- 发布与签名策略：`docs/release-signing.md`
+- 验收脚本与用例：`docs/acceptance.md`
+
 ---
 
 ## English
@@ -115,3 +121,9 @@ If needed, go to `System Settings -> Privacy & Security` and choose "Open Anyway
 ### Note
 
 Environment variable updates apply to new processes. Existing terminals, IDEs, and target apps usually need to be restarted to read updated values.
+
+### Related Docs
+
+- Platform differences and FAQ: `docs/platform-differences.md`
+- Release and signing strategy: `docs/release-signing.md`
+- Acceptance scripts and cases: `docs/acceptance.md`

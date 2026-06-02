@@ -23,6 +23,11 @@ pub fn read_persistent_var(key: &str) -> Result<Option<String>, String> {
     env_apply::read_persistent_var(key)
 }
 
+/// Notifies the host OS that environment values changed.
+pub fn notify_environment_change() -> Result<(), String> {
+    env_apply::notify_environment_change()
+}
+
 /// Runs post-apply hooks in a shell appropriate for the host OS.
 pub fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
     let mut results = Vec::new();

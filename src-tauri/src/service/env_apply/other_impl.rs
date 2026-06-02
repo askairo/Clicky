@@ -28,4 +28,8 @@ impl EnvApplier for OtherEnvApplier {
     fn read_persistent_var(&self, key: &str) -> Result<Option<String>, String> {
         Ok(std::env::var(key).ok())
     }
+
+    fn notify_environment_change(&self) -> Result<(), String> {
+        Ok(())
+    }
 }

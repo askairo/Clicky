@@ -21,7 +21,6 @@ impl EnvApplier for WindowsEnvApplier {
             .set_value(key, &value)
             .map_err(|e| format!("write HKCU\\Environment\\{} failed: {}", key, e))?;
         std::env::set_var(key, value);
-        broadcast_environment_change()?;
         Ok(())
     }
 
@@ -49,6 +48,10 @@ impl EnvApplier for WindowsEnvApplier {
             Ok(value) => Ok(Some(value)),
             Err(_) => Ok(None),
         }
+    }
+
+    fn notify_environment_change(&self) -> Result<(), String> {
+        broadcast_environment_change()
     }
 }
 

@@ -91,6 +91,10 @@ impl EnvApplier for MacosEnvApplier {
         }
         read_from_shell_snapshot(key)
     }
+
+    fn notify_environment_change(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 fn shell_single_quote(value: &str) -> String {

@@ -376,6 +376,9 @@ pub fn apply_environment_flow(
         variable_results.push(result);
     }
 
+    // Notify once after the full batch so Windows doesn't pay the broadcast cost for every variable.
+    let _ = system_service::notify_environment_change();
+
     if let Ok(Some(path)) = system_service::persist_shell_env_snapshot(&shell_items) {
         eprintln!("shell integration file updated: {}", path);
     }

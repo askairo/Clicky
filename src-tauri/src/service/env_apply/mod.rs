@@ -36,6 +36,8 @@ pub trait EnvApplier {
     fn runtime_capabilities(&self) -> RuntimeCapabilities;
     /// Reads back one variable from the persistent scope.
     fn read_persistent_var(&self, key: &str) -> Result<Option<String>, String>;
+    /// Notifies the OS that environment values changed, if the platform needs it.
+    fn notify_environment_change(&self) -> Result<(), String>;
 }
 
 /// Writes one variable through the current platform adapter.
@@ -60,6 +62,12 @@ pub fn runtime_capabilities() -> RuntimeCapabilities {
 pub fn read_persistent_var(key: &str) -> Result<Option<String>, String> {
     let applier = platform::CurrentEnvApplier;
     applier.read_persistent_var(key)
+}
+
+/// Signals to the host OS that the environment has changed.
+pub fn notify_environment_change() -> Result<(), String> {
+    let applier = platform::CurrentEnvApplier;
+    applier.notify_environment_change()
 }
 
 /// Returns the shell integration file path under the app data directory.

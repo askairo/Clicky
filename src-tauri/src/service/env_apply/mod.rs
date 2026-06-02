@@ -71,6 +71,7 @@ pub fn notify_environment_change() -> Result<(), String> {
 }
 
 /// Returns the shell integration file path under the app data directory.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn shell_integration_file_path() -> Result<PathBuf, String> {
     let db_path = storage_service::db_path()?;
     let base = db_path

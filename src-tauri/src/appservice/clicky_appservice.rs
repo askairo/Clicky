@@ -383,6 +383,10 @@ pub fn apply_environment_flow(
         eprintln!("shell integration file updated: {}", path);
     }
 
+    if let Ok(Some(path)) = system_service::persist_idea_env_snapshot(&shell_items) {
+        eprintln!("IDEA env file updated: {}", path);
+    }
+
     let hook_results = system_service::run_post_hooks(env.hooks.as_ref());
     let summary = build_apply_summary(&variable_results);
 
@@ -853,6 +857,91 @@ mod tests {
         assert_eq!(result.hook_results.len(), 1);
         assert!(result.hook_results[0].success);
         assert!(result.hook_results[0].message.contains("Clicky hook"));
+    }
+
+    #[test]
+    fn acceptance_idea_env_snapshot_written_and_updated() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("idea-env");
+
+        let mut dev_vars = HashMap::new();
+        dev_vars.insert(
+            "CLICKY_TEST_API_URL".to_string(),
+            "https://dev.example".to_string(),
+        );
+        dev_vars.insert("CLICKY_TEST_TOKEN".to_string(), "token-123".to_string());
+
+        let mut sit_vars = HashMap::new();
+        sit_vars.insert(
+            "CLICKY_TEST_API_URL".to_string(),
+            "https://sit.example".to_string(),
+        );
+        sit_vars.insert("CLICKY_TEST_TOKEN".to_string(), "token-456".to_string());
+
+        let mut environments = HashMap::new();
+        environments.insert(
+            "dev".to_string(),
+            EnvDef {
+                description: Some("development".to_string()),
+                variables: dev_vars,
+                hooks: None,
+            },
+        );
+        environments.insert(
+            "sit".to_string(),
+            EnvDef {
+                description: Some("system integration test".to_string()),
+                variables: sit_vars,
+                hooks: None,
+            },
+        );
+
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_string(),
+            GroupDef {
+                description: Some("default group".to_string()),
+                environments,
+            },
+        );
+
+        storage_service::save_config(&ConfigFile {
+            groups,
+            environments: HashMap::new(),
+        })
+        .expect("save config");
+
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply dev");
+        assert_eq!(result.summary.success, 2);
+
+        let idea_env_file = storage_service::db_path()
+            .expect("resolve db path")
+            .parent()
+            .expect("resolve clicky data dir")
+            .join("idea")
+            .join("current.env");
+
+        let first = fs::read_to_string(&idea_env_file).expect("read idea env file");
+        assert!(first.contains("CLICKY_TEST_API_URL=https://dev.example"));
+        assert!(first.contains("CLICKY_TEST_TOKEN=token-123"));
+
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "sit".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply sit");
+        assert_eq!(result.summary.success, 2);
+
+        let second = fs::read_to_string(&idea_env_file).expect("read updated idea env file");
+        assert!(second.contains("CLICKY_TEST_API_URL=https://sit.example"));
+        assert!(second.contains("CLICKY_TEST_TOKEN=token-456"));
+        assert!(!second.contains("https://dev.example"));
     }
 
     #[cfg(target_os = "windows")]

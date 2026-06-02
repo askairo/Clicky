@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
+/// Business orchestration for groups, environments, import/export, and apply flows.
 pub fn list_groups() -> Result<Vec<GroupSummary>, String> {
     let cfg = storage_service::load_config()?;
     let mut list = cfg
@@ -231,6 +232,7 @@ pub fn save_environment_variables(
 }
 
 fn normalize_group_variable_keys(group: &mut GroupDef) {
+    // Keep every environment in a group keyed by the same set of names so the editor can stay column-aligned.
     let mut key_set: HashSet<String> = HashSet::new();
     for env in group.environments.values() {
         for key in env.variables.keys() {
@@ -347,6 +349,7 @@ pub fn apply_environment_flow(
     let mut variable_results = Vec::new();
     let mut entries = env.variables.iter().collect::<Vec<_>>();
     entries.sort_by(|a, b| a.0.cmp(b.0));
+    // Snapshot the variables once so shell integration can use the exact same sorted payload.
     let shell_items = entries
         .iter()
         .map(|(k, v)| ((*k).clone(), (*v).clone()))
@@ -395,6 +398,7 @@ pub fn get_runtime_capabilities() -> RuntimeCapabilities {
 }
 
 fn build_apply_summary(results: &[VariableApplyResult]) -> ApplySummary {
+    // Keep the summary derived from the detailed per-variable results.
     let total = results.len();
     let success = results.iter().filter(|item| item.applied).count();
     let changed = results
@@ -410,6 +414,7 @@ fn build_apply_summary(results: &[VariableApplyResult]) -> ApplySummary {
 }
 
 fn validate_group_variable_uniqueness(cfg: &ConfigFile) -> Result<(), String> {
+    // A variable name may exist in multiple environments of the same group, but not across groups.
     let mut key_to_group: HashMap<String, String> = HashMap::new();
 
     for (group_name, group) in &cfg.groups {
@@ -478,6 +483,7 @@ fn merge_import(
 ) -> Result<ImportSummary, String> {
     let mut summary = ImportSummary::default();
     let mut key_owner: HashMap<String, String> = HashMap::new();
+    // Track which group currently owns each variable name so imports can respect the cross-group uniqueness rule.
     for (group_name, group) in &base.groups {
         for env in group.environments.values() {
             for key in env.variables.keys() {

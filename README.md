@@ -1,6 +1,11 @@
-﻿# Clicky / Clicky（中英双语）
+# Clicky / Clicky（中英双语）
 
-## 中文
+<p align="center">
+  <a href="#cn"><strong>中文</strong></a> ·
+  <a href="#en"><strong>English</strong></a>
+</p>
+
+<h2 id="cn">中文</h2>
 
 ### 项目简介
 
@@ -63,9 +68,7 @@ open /Applications/Clicky.app
 - 发布与签名策略：`docs/release-signing.md`
 - 验收脚本与用例：`docs/acceptance.md`
 
----
-
-## English
+<h2 id="en">English</h2>
 
 ### Overview
 

@@ -10,6 +10,7 @@ pub const MENU_QUIT: &str = "quit";
 pub const MENU_RECENT_0: &str = "recent_0";
 pub const MENU_RECENT_1: &str = "recent_1";
 
+/// Builds a short label for one tray quick-switch slot.
 fn format_recent_menu_label(item: Option<&EnvSelection>, index: usize) -> String {
     match item {
         Some(env) => format!("{}/{}", env.group, env.env),
@@ -17,7 +18,10 @@ fn format_recent_menu_label(item: Option<&EnvSelection>, index: usize) -> String
     }
 }
 
-fn build_tray_menu(app: &AppHandle, state: &AppRuntimeState) -> Result<Menu<tauri::Wry>, tauri::Error> {
+fn build_tray_menu(
+    app: &AppHandle,
+    state: &AppRuntimeState,
+) -> Result<Menu<tauri::Wry>, tauri::Error> {
     let recent = state.recent_snapshot();
     let current = recent.first();
     let first = recent.first();
@@ -45,10 +49,18 @@ fn build_tray_menu(app: &AppHandle, state: &AppRuntimeState) -> Result<Menu<taur
 
     Menu::with_items(
         app,
-        &[&open_item, &separator, &recent_0_item, &recent_1_item, &separator, &quit_item],
+        &[
+            &open_item,
+            &separator,
+            &recent_0_item,
+            &recent_1_item,
+            &separator,
+            &quit_item,
+        ],
     )
 }
 
+/// Rebuilds the tray menu after the recent-env cache changes.
 pub fn sync_tray_menu(app: &AppHandle) {
     let state = app.state::<AppRuntimeState>();
     let Ok(menu) = build_tray_menu(app, &state) else {
@@ -59,6 +71,7 @@ pub fn sync_tray_menu(app: &AppHandle) {
     }
 }
 
+/// Shows and focuses the existing main window instead of opening a duplicate.
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -67,6 +80,7 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// Sends a short notification used by tray-triggered actions.
 pub fn deliver_tray_feedback(app: &AppHandle, body: &str) {
     let _ = app
         .notification()
@@ -76,6 +90,7 @@ pub fn deliver_tray_feedback(app: &AppHandle, body: &str) {
         .show();
 }
 
+/// Creates the tray icon and wires the menu click handlers.
 pub fn setup_tray(app: &mut tauri::App) -> Result<(), tauri::Error> {
     let state = app.state::<AppRuntimeState>();
     let app_handle = app.handle().clone();

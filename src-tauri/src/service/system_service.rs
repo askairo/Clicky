@@ -1,24 +1,29 @@
-use crate::domain::{HookResult, HooksDef};
 use crate::domain::RuntimeCapabilities;
+use crate::domain::{HookResult, HooksDef};
 use crate::service::env_apply;
 use std::process::Command;
 
+/// Thin wrapper around platform-specific env handling and hook execution.
 pub fn apply_var_persistent(key: &str, value: &str) -> Result<(), String> {
     env_apply::apply_var_persistent(key, value)
 }
 
+/// Persists a shell snapshot when the current platform supports it.
 pub fn persist_shell_env_snapshot(items: &[(String, String)]) -> Result<Option<String>, String> {
     env_apply::persist_shell_env_snapshot(items)
 }
 
+/// Returns the platform capability summary shown in the frontend.
 pub fn runtime_capabilities() -> RuntimeCapabilities {
     env_apply::runtime_capabilities()
 }
 
+/// Reads a single variable from the persistent scope.
 pub fn read_persistent_var(key: &str) -> Result<Option<String>, String> {
     env_apply::read_persistent_var(key)
 }
 
+/// Runs post-apply hooks in a shell appropriate for the host OS.
 pub fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
     let mut results = Vec::new();
     let Some(post_hooks) = hooks.and_then(|h| h.post.as_ref()) else {

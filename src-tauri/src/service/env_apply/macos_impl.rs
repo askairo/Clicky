@@ -1,9 +1,10 @@
-use crate::service::env_apply::EnvApplier;
 use crate::domain::RuntimeCapabilities;
 use crate::service::env_apply::shell_integration_file_path;
+use crate::service::env_apply::EnvApplier;
 use std::fs;
 use std::process::Command;
 
+/// macOS adapter: updates the current session and writes a shell snapshot for terminal launches.
 #[derive(Copy, Clone)]
 pub struct MacosEnvApplier;
 
@@ -34,11 +35,19 @@ impl EnvApplier for MacosEnvApplier {
         Ok(())
     }
 
-    fn persist_shell_env_snapshot(&self, items: &[(String, String)]) -> Result<Option<String>, String> {
+    fn persist_shell_env_snapshot(
+        &self,
+        items: &[(String, String)],
+    ) -> Result<Option<String>, String> {
         let file_path = shell_integration_file_path()?;
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("create shell integration directory {} failed: {}", parent.display(), e))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "create shell integration directory {} failed: {}",
+                    parent.display(),
+                    e
+                )
+            })?;
         }
 
         let mut sorted = items.to_vec();
@@ -53,8 +62,13 @@ impl EnvApplier for MacosEnvApplier {
             content.push('\n');
         }
 
-        fs::write(&file_path, content)
-            .map_err(|e| format!("write shell integration file {} failed: {}", file_path.display(), e))?;
+        fs::write(&file_path, content).map_err(|e| {
+            format!(
+                "write shell integration file {} failed: {}",
+                file_path.display(),
+                e
+            )
+        })?;
         Ok(Some(file_path.display().to_string()))
     }
 
@@ -80,6 +94,7 @@ impl EnvApplier for MacosEnvApplier {
 }
 
 fn shell_single_quote(value: &str) -> String {
+    // Use shell-safe single quotes so exported values survive spaces and punctuation.
     let escaped = value.replace('\'', r#"'\''"#);
     format!("'{}'", escaped)
 }
@@ -105,8 +120,13 @@ fn read_from_shell_snapshot(key: &str) -> Result<Option<String>, String> {
     if !file_path.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(&file_path)
-        .map_err(|e| format!("read shell integration file {} failed: {}", file_path.display(), e))?;
+    let content = fs::read_to_string(&file_path).map_err(|e| {
+        format!(
+            "read shell integration file {} failed: {}",
+            file_path.display(),
+            e
+        )
+    })?;
     for line in content.lines() {
         let Some(rest) = line.strip_prefix("export ") else {
             continue;

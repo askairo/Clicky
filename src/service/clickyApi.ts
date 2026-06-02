@@ -11,6 +11,7 @@ import type {
 
 export type EnvSelectionDto = { group: string; env: string };
 
+// Thin IPC wrapper layer: every function here mirrors one Tauri command.
 export function listGroups() {
   return invoke<GroupSummary[]>("list_groups");
 }
@@ -56,6 +57,7 @@ export function saveEnvironmentVariables(groupName: string, envName: string, var
 }
 
 export function applyEnvironment(groupName: string, envName: string) {
+  // The app only supports persistent mode, so the frontend never passes a mode flag here.
   return invoke<ApplyResultDto>("apply_environment", { groupName, envName, mode: "persistent" });
 }
 

@@ -17,12 +17,14 @@ pub struct EnvSelection {
     pub env: String,
 }
 
+/// Keeps a short most-recently-used list for tray quick actions.
 #[derive(Default)]
 pub struct AppRuntimeState {
     recent: Mutex<VecDeque<EnvSelection>>,
 }
 
 impl AppRuntimeState {
+    /// Stores the recent-env cache beside the local SQLite database.
     fn recent_file_path() -> Result<PathBuf, String> {
         let db = storage_service::db_path()?;
         let base = db
@@ -31,6 +33,7 @@ impl AppRuntimeState {
         Ok(base.join("recent_envs.json"))
     }
 
+    /// Reloads the recent-env cache on startup.
     pub(crate) fn load_from_disk(&self) -> Result<(), String> {
         let path = Self::recent_file_path()?;
         if !path.exists() {
@@ -49,6 +52,7 @@ impl AppRuntimeState {
         Ok(())
     }
 
+    /// Best-effort persistence for tray history updates.
     fn save_to_disk(&self) -> Result<(), String> {
         let path = Self::recent_file_path()?;
         if let Some(parent) = path.parent() {
@@ -68,6 +72,7 @@ impl AppRuntimeState {
             .map_err(|e| format!("failed to write recent env file {}: {}", path.display(), e))
     }
 
+    /// Moves the selected environment to the front of the recent list.
     fn remember(&self, group: &str, env: &str) {
         let mut recent = self.recent.lock().expect("recent selections lock poisoned");
         recent.retain(|item| !(item.group == group && item.env == env));
@@ -82,25 +87,30 @@ impl AppRuntimeState {
         let _ = self.save_to_disk();
     }
 
+    /// Returns the Nth recent environment, if available.
     pub(crate) fn recent_at(&self, index: usize) -> Option<EnvSelection> {
         let recent = self.recent.lock().expect("recent selections lock poisoned");
         recent.get(index).cloned()
     }
 
+    /// Returns the subset used to render the tray menu.
     pub(crate) fn recent_snapshot(&self) -> Vec<EnvSelection> {
         let recent = self.recent.lock().expect("recent selections lock poisoned");
         recent.iter().take(2).cloned().collect()
     }
 }
 
+/// Records the latest environment selection for tray reuse.
 pub fn remember_recent_env(state: &AppRuntimeState, group: &str, env: &str) {
     state.remember(group, env);
 }
 
+/// Returns the most recent environment selection, if one exists.
 pub fn current_recent_env(state: &AppRuntimeState) -> Option<EnvSelection> {
     state.recent_at(0)
 }
 
+/// Creates local storage on first launch and imports legacy YAML when available.
 fn init_storage() -> Result<(), String> {
     let path = storage_service::db_path()?;
     let db_exists = path.exists();
@@ -120,6 +130,7 @@ fn init_storage() -> Result<(), String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Starts the Tauri application and wires the tray, plugins, and commands.
 pub fn run() {
     if let Err(e) = init_storage() {
         eprintln!("storage initialization failed: {}", e);

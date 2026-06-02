@@ -1,6 +1,7 @@
-use crate::service::env_apply::EnvApplier;
 use crate::domain::RuntimeCapabilities;
+use crate::service::env_apply::EnvApplier;
 
+/// Fallback adapter for unsupported platforms.
 #[derive(Copy, Clone)]
 pub struct OtherEnvApplier;
 
@@ -9,7 +10,10 @@ impl EnvApplier for OtherEnvApplier {
         Err("persistent apply is not implemented for this OS yet".to_string())
     }
 
-    fn persist_shell_env_snapshot(&self, _items: &[(String, String)]) -> Result<Option<String>, String> {
+    fn persist_shell_env_snapshot(
+        &self,
+        _items: &[(String, String)],
+    ) -> Result<Option<String>, String> {
         Ok(None)
     }
 

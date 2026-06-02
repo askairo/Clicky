@@ -7,6 +7,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use winreg::enums::HKEY_CURRENT_USER;
 use winreg::RegKey;
 
+/// Windows adapter: writes to HKCU\\Environment and broadcasts the change.
 #[derive(Copy, Clone)]
 pub struct WindowsEnvApplier;
 

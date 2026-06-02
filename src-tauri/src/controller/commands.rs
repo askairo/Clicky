@@ -1,12 +1,13 @@
 use crate::appservice;
 use crate::domain::{
-    ApplyResult, EnvSummary, ExportRequest, ExportResult, GroupSummary, ImportRequest, ImportSummary,
-    RuntimeCapabilities,
+    ApplyResult, EnvSummary, ExportRequest, ExportResult, GroupSummary, ImportRequest,
+    ImportSummary, RuntimeCapabilities,
 };
 use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri::State;
 
+/// Thin Tauri command layer: keep handlers focused on argument passing.
 #[tauri::command]
 pub fn list_groups() -> Result<Vec<GroupSummary>, String> {
     appservice::list_groups()
@@ -28,7 +29,11 @@ pub fn delete_group(group_name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn rename_environment(group_name: String, old_name: String, new_name: String) -> Result<(), String> {
+pub fn rename_environment(
+    group_name: String,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
     appservice::rename_environment(group_name, old_name, new_name)
 }
 
@@ -58,7 +63,10 @@ pub fn list_environments(group_name: String) -> Result<Vec<EnvSummary>, String> 
 }
 
 #[tauri::command]
-pub fn get_environment_variables(group_name: String, env_name: String) -> Result<HashMap<String, String>, String> {
+pub fn get_environment_variables(
+    group_name: String,
+    env_name: String,
+) -> Result<HashMap<String, String>, String> {
     appservice::get_environment_variables(group_name, env_name)
 }
 
@@ -84,6 +92,7 @@ pub fn apply_environment(
     app: AppHandle,
     state: State<'_, crate::AppRuntimeState>,
 ) -> Result<ApplyResult, String> {
+    // Update the tray state only after a successful apply so the quick-switch menu stays truthful.
     let result = appservice::apply_environment_flow(group_name.clone(), env_name.clone(), mode);
     if result.is_ok() {
         crate::remember_recent_env(&state, &group_name, &env_name);
@@ -93,7 +102,9 @@ pub fn apply_environment(
 }
 
 #[tauri::command]
-pub fn get_current_env_selection(state: State<'_, crate::AppRuntimeState>) -> Option<crate::EnvSelection> {
+pub fn get_current_env_selection(
+    state: State<'_, crate::AppRuntimeState>,
+) -> Option<crate::EnvSelection> {
     crate::current_recent_env(&state)
 }
 

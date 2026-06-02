@@ -36,6 +36,7 @@ import type {
   RuntimeCapabilitiesDto,
 } from "../domain";
 
+// Page-level orchestration: keep network/IPC details out of the React hook.
 export async function loadGroups(preferred: string | undefined, selectedGroup: string) {
   const list = await listGroups();
   const target = preferred || selectedGroup || list[0]?.name || "";
@@ -205,6 +206,7 @@ export async function syncFromCurrentSelection(
     activeEnvs: (groupName: string) => Promise<void>;
   },
 ) {
+  // When the tray switches environments, refresh the sidebar and editor together to avoid stale mixed state.
   const current = await loadCurrentEnvSelection();
   if (!current) return { ok: false as const };
   onGroup(current.group);

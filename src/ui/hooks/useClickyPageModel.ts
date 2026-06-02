@@ -92,6 +92,7 @@ export function useClickyPageModel() {
   };
 
   useEffect(() => {
+    // Theme is applied at the document root so the entire app updates consistently.
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
@@ -122,6 +123,7 @@ export function useClickyPageModel() {
   }, [selectedGroup]);
 
   useEffect(() => {
+    // Keep the editor in sync with the selected environment.
     loadDraftVariables(selectedGroup, selectedEnv)
       .then((next) => {
         setDraftVars(next);
@@ -143,6 +145,7 @@ export function useClickyPageModel() {
   useEffect(() => {
     let unlistenStatus: undefined | (() => void);
     let unlistenSwitched: undefined | (() => void);
+    // Tray events can change the selection outside the current window, so keep both views aligned.
     listen<string>("tray-switch-status", (event) => {
       setStatus(event.payload);
       syncFromCurrentSelection(setSelectedGroup, setSelectedEnv, {
@@ -238,6 +241,7 @@ export function useClickyPageModel() {
   const onDeleteRow = (idx: number) => {
     const target = draftVars[idx];
     if (!target) return;
+    // Use a confirmation modal for destructive row deletion so accidental clicks are less likely.
     setActionModal({
       title: "删除变量",
       description: `将删除变量“${target.key || "(empty)"}”，确认继续吗？`,
@@ -412,6 +416,7 @@ export function useClickyPageModel() {
     });
   };
   const onAddRowModal = () => {
+    // New rows are inserted through the modal so users can enter both key and value in one pass.
     setActionModal({
       title: "新增变量",
       description: "新增后会同步到同分组其他环境（仅同步 Key，其他环境值默认为空）。",

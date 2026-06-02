@@ -1,9 +1,10 @@
-﻿use crate::domain::{ConfigFile, EnvDef, GroupDef, HooksDef};
+use crate::domain::{ConfigFile, EnvDef, GroupDef, HooksDef};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+/// Owns local config discovery, SQLite persistence, and legacy YAML bootstrapping.
 fn config_path() -> Result<PathBuf, String> {
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
     let candidates = [
@@ -23,22 +24,29 @@ fn config_path() -> Result<PathBuf, String> {
         "failed to locate environments.yaml, checked: {} and {}",
         cwd.join("config").join("environments.yaml").display(),
         cwd.parent()
-            .map(|p| p.join("config").join("environments.yaml").display().to_string())
+            .map(|p| p
+                .join("config")
+                .join("environments.yaml")
+                .display()
+                .to_string())
             .unwrap_or_else(|| "<no-parent>".to_string())
     ))
 }
 
 fn clicky_data_dir() -> Result<PathBuf, String> {
+    // Store app-owned data under the user profile so the app stays portable across working directories.
     let home = std::env::var_os("USERPROFILE")
         .or_else(|| std::env::var_os("HOME"))
         .ok_or_else(|| "failed to resolve user home directory".to_string())?;
     Ok(PathBuf::from(home).join(".clicky"))
 }
 
+/// Returns the location of the SQLite database used by the desktop app.
 pub fn db_path() -> Result<PathBuf, String> {
     Ok(clicky_data_dir()?.join("environments.db"))
 }
 
+/// Normalizes old YAML layouts into the current grouped config shape.
 pub fn normalize_config(mut cfg: ConfigFile) -> ConfigFile {
     if !cfg.environments.is_empty() {
         let mut default_group = cfg.groups.remove("default").unwrap_or(GroupDef {
@@ -55,8 +63,8 @@ pub fn normalize_config(mut cfg: ConfigFile) -> ConfigFile {
 
 pub fn load_config_from_yaml() -> Result<ConfigFile, String> {
     let path = config_path()?;
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
     let cfg = serde_yaml::from_str::<ConfigFile>(&content)
         .map_err(|e| format!("failed to parse {}: {}", path.display(), e))?;
     Ok(normalize_config(cfg))
@@ -65,12 +73,18 @@ pub fn load_config_from_yaml() -> Result<ConfigFile, String> {
 pub fn open_db() -> Result<Connection, String> {
     let path = db_path()?;
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create data directory {}: {}", parent.display(), e))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create data directory {}: {}",
+                parent.display(),
+                e
+            )
+        })?;
     }
     Connection::open(path).map_err(|e| format!("failed to open sqlite db: {}", e))
 }
 
+/// Creates the SQLite tables when the app starts or when the database is new.
 pub fn ensure_db_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         "
@@ -112,15 +126,13 @@ pub fn load_config_from_db(conn: &Connection) -> Result<ConfigFile, String> {
             .map_err(|e| format!("failed to query groups: {}", e))?;
         let rows = stmt
             .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                ))
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
             })
             .map_err(|e| format!("failed to map groups: {}", e))?;
 
         for row in rows {
-            let (name, description) = row.map_err(|e| format!("failed to read group row: {}", e))?;
+            let (name, description) =
+                row.map_err(|e| format!("failed to read group row: {}", e))?;
             cfg.groups.insert(
                 name,
                 GroupDef {
@@ -176,6 +188,7 @@ pub fn load_config_from_db(conn: &Connection) -> Result<ConfigFile, String> {
             );
         }
 
+        // Read variables per environment so the SQL stays simple and the data shape stays explicit.
         let vars_iter = var_stmt
             .query_map(params![&group_name, &env_name], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -207,6 +220,7 @@ pub fn load_config_from_db(conn: &Connection) -> Result<ConfigFile, String> {
     Ok(cfg)
 }
 
+/// Writes the full in-memory config back to SQLite in one transaction.
 pub fn save_config_to_db(conn: &mut Connection, cfg: &ConfigFile) -> Result<(), String> {
     let tx = conn
         .transaction()
@@ -233,7 +247,12 @@ pub fn save_config_to_db(conn: &mut Connection, cfg: &ConfigFile) -> Result<(), 
                 .and_then(|h| h.post.as_ref())
                 .map(|post| serde_json::to_string(post))
                 .transpose()
-                .map_err(|e| format!("failed to serialize hooks for {}/{}: {}", group_name, env_name, e))?;
+                .map_err(|e| {
+                    format!(
+                        "failed to serialize hooks for {}/{}: {}",
+                        group_name, env_name, e
+                    )
+                })?;
 
             tx.execute(
                 "INSERT INTO environments(group_name, name, description, hooks_post_json) VALUES (?1, ?2, ?3, ?4)",
@@ -255,12 +274,14 @@ pub fn save_config_to_db(conn: &mut Connection, cfg: &ConfigFile) -> Result<(), 
         .map_err(|e| format!("failed to commit sqlite transaction: {}", e))
 }
 
+/// Loads the current config from the persistent database, creating the schema first if needed.
 pub fn load_config() -> Result<ConfigFile, String> {
     let conn = open_db()?;
     ensure_db_schema(&conn)?;
     load_config_from_db(&conn)
 }
 
+/// Saves the current config to the persistent database.
 pub fn save_config(cfg: &ConfigFile) -> Result<(), String> {
     let mut conn = open_db()?;
     ensure_db_schema(&conn)?;

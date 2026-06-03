@@ -442,20 +442,33 @@ pub fn apply_environment_flow(
         idea_started.elapsed().as_millis()
     );
 
-    let hooks_started = Instant::now();
-    let hook_results = system_service::run_post_hooks(env.hooks.as_ref());
-    info!(
-        "[clicky][apply] run_post_hooks={}ms count={}",
-        hooks_started.elapsed().as_millis(),
-        hook_results.len()
-    );
-
     let summary_started = Instant::now();
     let summary = build_apply_summary(&variable_results);
     info!(
         "[clicky][apply] build_summary={}ms",
         summary_started.elapsed().as_millis()
     );
+
+    let hook_results = if summary.changed > 0 {
+        let hooks_to_queue = env.hooks.clone();
+        let hooks_started = Instant::now();
+        match system_service::queue_post_hooks(hooks_to_queue) {
+            Ok(()) => info!(
+                "[clicky][apply] queue_post_hooks={}ms count={}",
+                hooks_started.elapsed().as_millis(),
+                env.hooks
+                    .as_ref()
+                    .and_then(|h| h.post.as_ref())
+                    .map_or(0, |items| items.len())
+            ),
+            Err(err) => info!("[clicky][apply] queue_post_hooks_failed error={}", err),
+        }
+        Vec::new()
+    } else {
+        info!("[clicky][apply] skip_post_hooks reason=unchanged");
+        Vec::new()
+    };
+
     info!(
         "[clicky][apply] finish total={}ms success={}/{} changed={}",
         flow_started.elapsed().as_millis(),
@@ -928,9 +941,74 @@ mod tests {
         assert_eq!(result.summary.total, 2);
         assert_eq!(result.summary.success, 2);
         assert_eq!(result.summary.failed, 0);
-        assert_eq!(result.hook_results.len(), 1);
-        assert!(result.hook_results[0].success);
-        assert!(result.hook_results[0].message.contains("Clicky hook"));
+        assert!(result.hook_results.is_empty());
+    }
+
+    #[test]
+    fn acceptance_hooks_are_queued_without_blocking() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("hooks-async");
+
+        let mut config = sample_config();
+        if let Some(group) = config.groups.get_mut("default") {
+            if let Some(env) = group.environments.get_mut("dev") {
+                #[cfg(target_os = "windows")]
+                let hook_cmd = "powershell -NoProfile -Command Start-Sleep -Seconds 1".to_string();
+                #[cfg(not(target_os = "windows"))]
+                let hook_cmd = "sleep 1".to_string();
+                env.hooks = Some(HooksDef {
+                    post: Some(vec![hook_cmd]),
+                });
+            }
+        }
+
+        storage_service::save_config(&config).expect("save config");
+
+        let started = std::time::Instant::now();
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply config");
+        let elapsed = started.elapsed();
+
+        assert_eq!(result.summary.total, 2);
+        assert_eq!(result.summary.success, 2);
+        assert!(result.hook_results.is_empty());
+        assert!(
+            elapsed.as_millis() < 500,
+            "apply should not block on hook execution, elapsed={}ms",
+            elapsed.as_millis()
+        );
+    }
+
+    #[test]
+    fn acceptance_hooks_skipped_when_env_unchanged() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("hooks-unchanged");
+
+        let config = sample_config();
+        storage_service::save_config(&config).expect("save config");
+
+        let first = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("first apply");
+        assert_eq!(first.summary.total, 2);
+        assert_eq!(first.summary.success, 2);
+        assert!(first.hook_results.is_empty());
+
+        let second = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("second apply");
+        assert_eq!(second.summary.changed, 0);
+        assert!(second.hook_results.is_empty());
     }
 
     #[test]

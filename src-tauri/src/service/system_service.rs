@@ -2,9 +2,12 @@ use crate::domain::RuntimeCapabilities;
 use crate::domain::{HookResult, HooksDef};
 use crate::service::env_apply;
 use crate::service::storage_service;
+use log::{info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
+use std::time::Instant;
 
 /// Thin wrapper around platform-specific env handling and hook execution.
 pub fn apply_var_persistent(key: &str, value: &str) -> Result<(), String> {
@@ -29,6 +32,41 @@ pub fn read_persistent_var(key: &str) -> Result<Option<String>, String> {
 /// Notifies the host OS that environment values changed.
 pub fn notify_environment_change() -> Result<(), String> {
     env_apply::notify_environment_change()
+}
+
+/// Queues post-apply hooks on a background thread so environment switching is not blocked.
+pub fn queue_post_hooks(hooks: Option<HooksDef>) -> Result<(), String> {
+    let Some(hooks) = hooks else {
+        return Ok(());
+    };
+
+    thread::Builder::new()
+        .name("clicky-post-hooks".to_string())
+        .spawn(move || {
+            let started = Instant::now();
+            let results = run_post_hooks(Some(&hooks));
+            info!(
+                "[clicky][hooks] finished total={}ms count={}",
+                started.elapsed().as_millis(),
+                results.len()
+            );
+            for result in results {
+                if result.success {
+                    info!(
+                        "[clicky][hooks] ok command={} code={:?} message={}",
+                        result.command, result.code, result.message
+                    );
+                } else {
+                    warn!(
+                        "[clicky][hooks] fail command={} code={:?} message={}",
+                        result.command, result.code, result.message
+                    );
+                }
+            }
+        })
+        .map_err(|e| format!("failed to queue post hooks: {}", e))?;
+
+    Ok(())
 }
 
 /// Persists a cross-platform application-level dotenv snapshot for IDEs such as IntelliJ IDEA.

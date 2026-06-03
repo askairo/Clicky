@@ -17,6 +17,7 @@ Clicky 是一个受 SwitchHosts 启发的跨平台桌面工具，专注于环境
 - 基于 Tauri + React 的桌面应用
 - 前端采用分层结构：`ui / appservice / service / domain / utils`
 - 支持环境变量配置管理与一键应用
+- 支持切换后自动导出 IDEA 可引用的应用级 `.env` 快照
 - 默认对敏感变量脱敏显示
 - 支持切换后执行 `hooks.post` 命令
 
@@ -62,6 +63,8 @@ open /Applications/Clicky.app
 
 环境变量切换对“新进程”生效。已有终端、IDE、目标程序通常需要重启后才能读取到最新值。
 
+如果你在 IntelliJ IDEA 中使用 `Run/Debug Configuration` 指向 `~/.clicky/idea/current.env`，Clicky 会在每次切换后自动更新该文件，供新开的调试任务读取最新变量。
+
 ### 相关文档
 
 - 平台差异与常见问题：`docs/platform-differences.md`
@@ -80,6 +83,7 @@ Clicky is a cross-platform desktop app inspired by SwitchHosts, focused on group
 - Desktop app built with Tauri + React
 - Frontend layered architecture: `ui / appservice / service / domain / utils`
 - Supports environment-variable config management and one-click apply
+- Supports automatic export of an IDEA-friendly application-level `.env` snapshot after each switch
 - Sensitive values are masked by default
 - Supports post-switch `hooks.post` commands
 
@@ -124,6 +128,8 @@ If needed, go to `System Settings -> Privacy & Security` and choose "Open Anyway
 ### Note
 
 Environment variable updates apply to new processes. Existing terminals, IDEs, and target apps usually need to be restarted to read updated values.
+
+If you point IntelliJ IDEA `Run/Debug Configuration` to `~/.clicky/idea/current.env`, Clicky will refresh that file after each switch so newly launched debug tasks can read the latest values.
 
 ### Related Docs
 

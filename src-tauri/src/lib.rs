@@ -4,6 +4,7 @@ mod domain;
 mod service;
 
 use crate::service::storage_service;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs;
@@ -132,8 +133,14 @@ fn init_storage() -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Starts the Tauri application and wires the tray, plugins, and commands.
 pub fn run() {
+    if let Err(e) = service::log_service::init() {
+        eprintln!("failed to initialize logger: {}", e);
+    } else {
+        info!("logger initialized");
+    }
+
     if let Err(e) = init_storage() {
-        eprintln!("storage initialization failed: {}", e);
+        error!("storage initialization failed: {}", e);
     }
 
     tauri::Builder::default()

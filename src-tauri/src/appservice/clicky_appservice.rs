@@ -1,8 +1,10 @@
 use crate::domain::*;
 use crate::service::{storage_service, system_service};
+use log::info;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Business orchestration for groups, environments, import/export, and apply flows.
 pub fn list_groups() -> Result<Vec<GroupSummary>, String> {
@@ -327,7 +329,20 @@ pub fn apply_environment_flow(
     env_name: String,
     mode: String,
 ) -> Result<ApplyResult, String> {
+    let flow_started = Instant::now();
+    info!(
+        "[clicky][apply] start {}/{} mode={}",
+        group_name, env_name, mode
+    );
+
+    let load_started = Instant::now();
     let cfg = storage_service::load_config()?;
+    info!(
+        "[clicky][apply] load_config={}ms",
+        load_started.elapsed().as_millis()
+    );
+
+    let lookup_started = Instant::now();
     let group = cfg
         .groups
         .get(&group_name)
@@ -338,6 +353,10 @@ pub fn apply_environment_flow(
             env_name, group_name
         )
     })?;
+    info!(
+        "[clicky][apply] resolve_group_env={}ms",
+        lookup_started.elapsed().as_millis()
+    );
 
     if mode != "persistent" {
         return Err(
@@ -347,16 +366,29 @@ pub fn apply_environment_flow(
     }
 
     let mut variable_results = Vec::new();
+    let mut read_cost = 0u128;
+    let mut write_cost = 0u128;
     let mut entries = env.variables.iter().collect::<Vec<_>>();
+    let sort_started = Instant::now();
     entries.sort_by(|a, b| a.0.cmp(b.0));
+    info!(
+        "[clicky][apply] sort_vars={}ms count={}",
+        sort_started.elapsed().as_millis(),
+        entries.len()
+    );
     // Snapshot the variables once so shell integration can use the exact same sorted payload.
     let shell_items = entries
         .iter()
         .map(|(k, v)| ((*k).clone(), (*v).clone()))
         .collect::<Vec<_>>();
 
+    let apply_started = Instant::now();
     for (k, v) in entries {
+        let read_started = Instant::now();
         let before = system_service::read_persistent_var(k).ok().flatten();
+        read_cost += read_started.elapsed().as_micros();
+
+        let write_started = Instant::now();
         let result = match system_service::apply_var_persistent(k, v) {
             Ok(_) => VariableApplyResult {
                 key: k.clone(),
@@ -373,22 +405,64 @@ pub fn apply_environment_flow(
                 message: e,
             },
         };
+        write_cost += write_started.elapsed().as_micros();
         variable_results.push(result);
     }
+    info!(
+        "[clicky][apply] vars_apply_total={}ms read={}ms write={}ms count={}",
+        apply_started.elapsed().as_millis(),
+        read_cost / 1000,
+        write_cost / 1000,
+        variable_results.len()
+    );
 
+    let notify_started = Instant::now();
     // Notify once after the full batch so Windows doesn't pay the broadcast cost for every variable.
     let _ = system_service::notify_environment_change();
+    info!(
+        "[clicky][apply] notify_environment_change={}ms",
+        notify_started.elapsed().as_millis()
+    );
 
+    let shell_started = Instant::now();
     if let Ok(Some(path)) = system_service::persist_shell_env_snapshot(&shell_items) {
-        eprintln!("shell integration file updated: {}", path);
+        info!("shell integration file updated: {}", path);
     }
+    info!(
+        "[clicky][apply] persist_shell_env_snapshot={}ms",
+        shell_started.elapsed().as_millis()
+    );
 
+    let idea_started = Instant::now();
     if let Ok(Some(path)) = system_service::persist_idea_env_snapshot(&shell_items) {
-        eprintln!("IDEA env file updated: {}", path);
+        info!("IDEA env file updated: {}", path);
     }
+    info!(
+        "[clicky][apply] persist_idea_env_snapshot={}ms",
+        idea_started.elapsed().as_millis()
+    );
 
+    let hooks_started = Instant::now();
     let hook_results = system_service::run_post_hooks(env.hooks.as_ref());
+    info!(
+        "[clicky][apply] run_post_hooks={}ms count={}",
+        hooks_started.elapsed().as_millis(),
+        hook_results.len()
+    );
+
+    let summary_started = Instant::now();
     let summary = build_apply_summary(&variable_results);
+    info!(
+        "[clicky][apply] build_summary={}ms",
+        summary_started.elapsed().as_millis()
+    );
+    info!(
+        "[clicky][apply] finish total={}ms success={}/{} changed={}",
+        flow_started.elapsed().as_millis(),
+        summary.success,
+        summary.total,
+        summary.changed
+    );
 
     Ok(ApplyResult {
         group: group_name,
@@ -923,6 +997,7 @@ mod tests {
             .expect("resolve db path")
             .parent()
             .expect("resolve clicky data dir")
+            .join("env")
             .join("idea")
             .join("current.env");
 
@@ -942,6 +1017,75 @@ mod tests {
         assert!(second.contains("CLICKY_TEST_API_URL=https://sit.example"));
         assert!(second.contains("CLICKY_TEST_TOKEN=token-456"));
         assert!(!second.contains("https://dev.example"));
+    }
+
+    #[test]
+    fn acceptance_idea_env_snapshot_skips_unchanged_write() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("idea-env-skip");
+
+        let items = vec![
+            (
+                "CLICKY_TEST_API_URL".to_string(),
+                "https://dev.example".to_string(),
+            ),
+            ("CLICKY_TEST_TOKEN".to_string(), "token-123".to_string()),
+        ];
+
+        let first =
+            system_service::persist_idea_env_snapshot(&items).expect("write idea env snapshot");
+        assert!(first.is_some());
+
+        let second = system_service::persist_idea_env_snapshot(&items)
+            .expect("skip unchanged idea env snapshot");
+        assert!(second.is_none());
+    }
+
+    #[test]
+    fn acceptance_apply_timing_probe_many_vars() {
+        let _lock = test_lock();
+        let _guard = DataDirGuard::new("timing-probe");
+
+        let mut variables = HashMap::new();
+        for idx in 0..40 {
+            variables.insert(
+                format!("CLICKY_TIMING_VAR_{idx:02}"),
+                format!("value-{idx:02}"),
+            );
+        }
+
+        let mut environments = HashMap::new();
+        environments.insert(
+            "dev".to_string(),
+            EnvDef {
+                description: Some("timing probe".to_string()),
+                variables,
+                hooks: None,
+            },
+        );
+
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_string(),
+            GroupDef {
+                description: Some("default group".to_string()),
+                environments,
+            },
+        );
+
+        storage_service::save_config(&ConfigFile {
+            groups,
+            environments: HashMap::new(),
+        })
+        .expect("save timing config");
+
+        let result = apply_environment_flow(
+            "default".to_string(),
+            "dev".to_string(),
+            "persistent".to_string(),
+        )
+        .expect("apply timing config");
+        assert_eq!(result.summary.success, 40);
     }
 
     #[cfg(target_os = "windows")]

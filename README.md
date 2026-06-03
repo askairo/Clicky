@@ -63,7 +63,7 @@ open /Applications/Clicky.app
 
 环境变量切换对“新进程”生效。已有终端、IDE、目标程序通常需要重启后才能读取到最新值。
 
-如果你在 IntelliJ IDEA 中使用 `Run/Debug Configuration` 指向 `~/.clicky/idea/current.env`，Clicky 会在每次切换后自动更新该文件，供新开的调试任务读取最新变量。
+如果你在 IntelliJ IDEA 中使用 `Run/Debug Configuration` 指向 `~/.clicky/env/idea/current.env`，Clicky 会在每次切换后自动更新该文件，供新开的调试任务读取最新变量。
 
 ### 相关文档
 
@@ -129,7 +129,7 @@ If needed, go to `System Settings -> Privacy & Security` and choose "Open Anyway
 
 Environment variable updates apply to new processes. Existing terminals, IDEs, and target apps usually need to be restarted to read updated values.
 
-If you point IntelliJ IDEA `Run/Debug Configuration` to `~/.clicky/idea/current.env`, Clicky will refresh that file after each switch so newly launched debug tasks can read the latest values.
+If you point IntelliJ IDEA `Run/Debug Configuration` to `~/.clicky/env/idea/current.env`, Clicky will refresh that file after each switch so newly launched debug tasks can read the latest values.
 
 ### Related Docs
 

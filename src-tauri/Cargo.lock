@@ -482,6 +482,8 @@ name = "clicky"
 version = "0.1.5"
 dependencies = [
  "anyhow",
+ "chrono",
+ "log",
  "rusqlite",
  "serde",
  "serde_json",

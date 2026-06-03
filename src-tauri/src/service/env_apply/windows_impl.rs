@@ -1,6 +1,8 @@
 use crate::domain::RuntimeCapabilities;
 use crate::service::env_apply::EnvApplier;
+use log::warn;
 
+use std::thread;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
 };
@@ -51,7 +53,15 @@ impl EnvApplier for WindowsEnvApplier {
     }
 
     fn notify_environment_change(&self) -> Result<(), String> {
-        broadcast_environment_change()
+        thread::Builder::new()
+            .name("clicky-env-notify".to_string())
+            .spawn(|| {
+                if let Err(err) = broadcast_environment_change() {
+                    warn!("{}", err);
+                }
+            })
+            .map_err(|e| format!("failed to spawn environment-change notifier: {}", e))?;
+        Ok(())
     }
 }
 

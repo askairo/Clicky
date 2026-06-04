@@ -4,13 +4,13 @@
 
 ### 平台差异
 
-- Windows：Clicky 将变量写入当前用户环境，并广播环境变更通知；新开进程可以读取到最新值，旧进程通常需要重启。
-- macOS：Clicky 通过 `launchctl setenv` 更新当前会话，同时生成 `~/.clicky/env.sh` 作为 shell 持久化快照，方便终端类启动链路读取。
+- Windows：clicky 将变量写入当前用户环境，并广播环境变更通知；新开进程可以读取到最新值，旧进程通常需要重启。
+- macOS：clicky 通过 `launchctl setenv` 更新当前会话，同时生成 `~/.clicky/env.sh` 作为 shell 持久化快照，方便终端类启动链路读取。
 - 其他平台：当前只保留占位实现，不作为正式支持目标。
 
 ### 为什么需要重启进程
 
-环境变量通常在进程启动时读取。Clicky 可以把新值写入系统层或会话层，但无法强制已经运行中的程序自动重新加载自己的环境快照。
+环境变量通常在进程启动时读取。clicky 可以把新值写入系统层或会话层，但无法强制已经运行中的程序自动重新加载自己的环境快照。
 
 因此：
 
@@ -38,13 +38,13 @@
 
 ### Platform Differences
 
-- Windows: Clicky writes to the current user's environment and broadcasts the environment-change notification; new processes can read the updated values, while existing ones usually need a restart.
-- macOS: Clicky updates the current session with `launchctl setenv` and also generates `~/.clicky/env.sh` as a shell persistence snapshot for terminal-style startup flows.
+- Windows: clicky writes to the current user's environment and broadcasts the environment-change notification; new processes can read the updated values, while existing ones usually need a restart.
+- macOS: clicky updates the current session with `launchctl setenv` and also generates `~/.clicky/env.sh` as a shell persistence snapshot for terminal-style startup flows.
 - Other platforms: only placeholder support is kept for now and they are not the formal target.
 
 ### Why a Restart Is Needed
 
-Environment variables are usually read at process start. Clicky can write the new value into the system or session layer, but it cannot force a running app to reload its own environment snapshot.
+Environment variables are usually read at process start. clicky can write the new value into the system or session layer, but it cannot force a running app to reload its own environment snapshot.
 
 So:
 
@@ -61,7 +61,7 @@ So:
 
 ### FAQ
 
-- Q: Why does Clicky show the environment as active, but one program still sees the old value?
+- Q: Why does clicky show the environment as active, but one program still sees the old value?
   - A: That program is usually already running and must be restarted to reload the new environment.
 - Q: Why does macOS still warn about verification?
   - A: If signing and notarization are not complete yet, Gatekeeper may still require manual approval.

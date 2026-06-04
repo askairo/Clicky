@@ -53,7 +53,7 @@ impl EnvApplier for MacosEnvApplier {
         let mut sorted = items.to_vec();
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let mut content = String::from("# Managed by Clicky. Do not edit manually.\n");
+        let mut content = String::from("# Managed by clicky. Do not edit manually.\n");
         for (key, value) in sorted {
             content.push_str("export ");
             content.push_str(&key);

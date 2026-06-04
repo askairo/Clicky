@@ -360,7 +360,7 @@ pub fn apply_environment_flow(
 
     if mode != "persistent" {
         return Err(
-            "Clicky only supports persistent mode; reopen target processes after applying"
+            "clicky only supports persistent mode; reopen target processes after applying"
                 .to_string(),
         );
     }
@@ -815,7 +815,7 @@ mod tests {
                 description: Some("development".to_string()),
                 variables,
                 hooks: Some(HooksDef {
-                    post: Some(vec!["echo Clicky hook".to_string()]),
+                    post: Some(vec!["echo clicky hook".to_string()]),
                 }),
             },
         );

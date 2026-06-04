@@ -1,7 +1,7 @@
 [package]
 name = "clicky"
 version = "0.1.6"
-description = "Clicky desktop environment switcher"
+description = "clicky desktop environment switcher"
 authors = ["askairo"]
 edition = "2021"
 

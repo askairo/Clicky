@@ -1,10 +1,10 @@
-# Clicky Backend Architecture / Clicky 后端架构说明
+# clicky Backend Architecture / clicky 后端架构说明
 
 ## 中文
 
 ### 1. 目标与边界
 
-`src-tauri` 是 Clicky 桌面端的 Rust 后端，核心职责：
+`src-tauri` 是 clicky 桌面端的 Rust 后端，核心职责：
 
 1. 对前端暴露 Tauri Commands（本地 API）
 2. 执行业务编排（环境、分组、导入导出、应用流程）
@@ -80,7 +80,7 @@ src-tauri/src
 
 ### 1. Goal and Scope
 
-`src-tauri` is the Rust backend for the Clicky desktop app. Its responsibilities:
+`src-tauri` is the Rust backend for the clicky desktop app. Its responsibilities:
 
 1. Expose Tauri Commands as local APIs for the frontend
 2. Orchestrate business flows (groups, environments, import/export, apply)

@@ -20,9 +20,9 @@ jobs:
     env:
       TAP_REPO: askairo/homebrew-tap
       CASK_NAME: clicky
-      APP_NAME: Clicky
+      APP_NAME: clicky
       APP_DESC: Cross-platform environment profile switcher for Spring Boot
-      APP_HOMEPAGE: https://github.com/askairo/Clicky
+      APP_HOMEPAGE: https://github.com/askairo/clicky
       MAC_ASSET_PATTERN: _aarch64.dmg
 
     steps:

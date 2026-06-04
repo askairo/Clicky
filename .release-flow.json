@@ -6,9 +6,9 @@
     "repo": "askairo/homebrew-tap",
     "caskName": "clicky",
     "macArtifactPattern": "_aarch64.dmg",
-    "appName": "Clicky",
+    "appName": "clicky",
     "desc": "Cross-platform environment profile switcher for Spring Boot",
-    "homepage": "https://github.com/askairo/Clicky"
+    "homepage": "https://github.com/askairo/clicky"
   },
   "assetPatterns": [
     "src-tauri/target/release/bundle/nsis/*-setup.exe",

@@ -1,8 +1,8 @@
-# Clicky
+# clicky
 
 [English](README.md) | 中文
 
-Clicky 是一个受 SwitchHosts 启发的跨平台桌面工具，专注于环境变量分组管理与一键切换。
+clicky 是一个受 SwitchHosts 启发的跨平台桌面工具，专注于环境变量分组管理与一键切换。
 
 ## 当前状态
 
@@ -20,7 +20,7 @@ Clicky 是一个受 SwitchHosts 启发的跨平台桌面工具，专注于环境
 
 - Windows：下载 `.exe` 或 `.msi`
 - macOS：下载 `.dmg`
-- Release 页面：<https://github.com/askairo/Clicky/releases>
+- Release 页面：<https://github.com/askairo/clicky/releases>
 
 ### 方式二：macOS 使用 Homebrew
 
@@ -41,11 +41,11 @@ npm run tauri dev
 如果提示“已损坏/无法打开”，通常是 macOS Gatekeeper 对未签名应用的拦截。可执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Clicky.app
-open /Applications/Clicky.app
+xattr -dr com.apple.quarantine /Applications/clicky.app
+open /Applications/clicky.app
 ```
 
-若仍被拦截，请在“系统设置 -> 隐私与安全性”中对 Clicky 选择“仍要打开”。
+若仍被拦截，请在“系统设置 -> 隐私与安全性”中对 clicky 选择“仍要打开”。
 
 ## 配置与存储
 
@@ -57,7 +57,7 @@ open /Applications/Clicky.app
 
 环境变量切换对“新进程”生效。已有终端、IDE、目标程序通常需要重启后才能读取到最新值。
 
-如果你在 IntelliJ IDEA 中使用 `Run/Debug Configuration` 指向 `~/.clicky/env/idea/current.env`，Clicky 会在每次切换后自动更新该文件，供新开的调试任务读取最新变量。
+如果你在 IntelliJ IDEA 中使用 `Run/Debug Configuration` 指向 `~/.clicky/env/idea/current.env`，clicky 会在每次切换后自动更新该文件，供新开的调试任务读取最新变量。
 
 ## 相关文档
 

@@ -44,8 +44,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: "v__VERSION__"
-          releaseName: "Clicky v__VERSION__"
-          releaseBody: "Cross-platform desktop build artifacts for Clicky."
+          releaseName: "clicky v__VERSION__"
+          releaseBody: "Cross-platform desktop build artifacts for clicky."
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.tauri_args }}

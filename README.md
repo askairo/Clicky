@@ -1,8 +1,8 @@
-# Clicky
+# clicky
 
 English | [中文](README_ZH.md)
 
-Clicky is a cross-platform desktop app inspired by SwitchHosts. It focuses on grouped environment-variable management and one-click environment switching.
+clicky is a cross-platform desktop app inspired by SwitchHosts. It focuses on grouped environment-variable management and one-click environment switching.
 
 ## Current Status
 
@@ -20,7 +20,7 @@ Clicky is a cross-platform desktop app inspired by SwitchHosts. It focuses on gr
 
 - Windows: download `.exe` or `.msi`
 - macOS: download `.dmg`
-- Releases: <https://github.com/askairo/Clicky/releases>
+- Releases: <https://github.com/askairo/clicky/releases>
 
 ### Option 2: Homebrew on macOS
 
@@ -41,11 +41,11 @@ npm run tauri dev
 If macOS reports that the app is damaged or cannot be opened, Gatekeeper is usually blocking an unsigned app. Run:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Clicky.app
-open /Applications/Clicky.app
+xattr -dr com.apple.quarantine /Applications/clicky.app
+open /Applications/clicky.app
 ```
 
-If needed, go to `System Settings -> Privacy & Security` and choose `Open Anyway` for Clicky.
+If needed, go to `System Settings -> Privacy & Security` and choose `Open Anyway` for clicky.
 
 ## Config and Storage
 
@@ -57,7 +57,7 @@ If needed, go to `System Settings -> Privacy & Security` and choose `Open Anyway
 
 Environment-variable updates apply to new processes. Existing terminals, IDEs, and target apps usually need to be restarted before they can read updated values.
 
-If you point an IntelliJ IDEA `Run/Debug Configuration` to `~/.clicky/env/idea/current.env`, Clicky refreshes that file after each switch so newly launched debug tasks can read the latest values.
+If you point an IntelliJ IDEA `Run/Debug Configuration` to `~/.clicky/env/idea/current.env`, clicky refreshes that file after each switch so newly launched debug tasks can read the latest values.
 
 ## Related Docs
 

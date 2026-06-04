@@ -4,7 +4,7 @@
 
 ### 目标
 
-Clicky 的发布策略分成两层：
+clicky 的发布策略分成两层：
 
 1. `development` 版：用于本地验证、CI 构建和日常迭代，不依赖签名与公证。
 2. `release` 版：用于对外分发，需要在对应平台准备签名材料，再执行正式打包与发布。
@@ -42,7 +42,7 @@ Clicky 的发布策略分成两层：
 
 ### Goal
 
-Clicky uses two release lanes:
+clicky uses two release lanes:
 
 1. `development` builds for local validation, CI, and day-to-day iteration, without signing or notarization requirements.
 2. `release` builds for external distribution, which should use platform signing materials before packaging and publishing.

@@ -27,7 +27,7 @@ fn build_tray_menu(
     let first = recent.first();
     let second = recent.get(1);
 
-    let open_item = MenuItem::with_id(app, MENU_OPEN, "打开 Clicky", true, None::<&str>)?;
+    let open_item = MenuItem::with_id(app, MENU_OPEN, "打开 clicky", true, None::<&str>)?;
     let recent_0_item = CheckMenuItem::with_id(
         app,
         MENU_RECENT_0,
@@ -85,7 +85,7 @@ pub fn deliver_tray_feedback(app: &AppHandle, body: &str) {
     let _ = app
         .notification()
         .builder()
-        .title("Clicky")
+        .title("clicky")
         .body(body)
         .show();
 }

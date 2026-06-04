@@ -12,4 +12,4 @@ groups:
           ZNDER_MYSQL_PASS: "<REPLACE_ME>"
         hooks:
           post:
-            - "echo Clicky switched to dev"
+            - "echo clicky switched to dev"

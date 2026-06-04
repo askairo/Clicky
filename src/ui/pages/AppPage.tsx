@@ -31,7 +31,7 @@ function App() {
         <div className="brand">
           <img className="app-logo" src="/clicky-logo.png" alt="" aria-hidden="true" />
           <div>
-            <h1>Clicky</h1>
+            <h1>clicky</h1>
             <p>环境切换工具</p>
           </div>
         </div>

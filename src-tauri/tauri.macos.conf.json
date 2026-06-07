@@ -1,0 +1,15 @@
+{
+  "app": {
+    "windows": [
+      {
+        "titleBarStyle": "Transparent",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true
+      }
+    ]
+  }
+}

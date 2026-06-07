@@ -74,9 +74,12 @@ pub fn sync_tray_menu(app: &AppHandle) {
 /// Shows and focuses the existing main window instead of opening a duplicate.
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
         let _ = window.show();
         let _ = window.unminimize();
+        let _ = window.set_visible_on_all_workspaces(true);
         let _ = window.set_focus();
+        let _ = window.set_visible_on_all_workspaces(false);
     }
 }
 
@@ -98,7 +101,7 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), tauri::Error> {
 
     let mut tray_builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&tray_menu)
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(true)
         .on_menu_event(move |tray, event| {
             crate::appservice::handle_tray_menu_event(tray.app_handle(), event.id.as_ref())
         });

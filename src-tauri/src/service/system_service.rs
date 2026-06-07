@@ -5,7 +5,7 @@ use crate::service::storage_service;
 use log::{info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Instant;
 
@@ -44,22 +44,19 @@ pub fn queue_post_hooks(hooks: Option<HooksDef>) -> Result<(), String> {
         .name("clicky-post-hooks".to_string())
         .spawn(move || {
             let started = Instant::now();
-            let results = run_post_hooks(Some(&hooks));
+            let results = spawn_post_hooks(Some(&hooks));
             info!(
-                "[clicky][hooks] finished total={}ms count={}",
+                "[clicky][hooks] queued total={}ms count={}",
                 started.elapsed().as_millis(),
                 results.len()
             );
             for result in results {
                 if result.success {
-                    info!(
-                        "[clicky][hooks] ok command={} code={:?} message={}",
-                        result.command, result.code, result.message
-                    );
+                    info!("[clicky][hooks] queued command={}", result.command);
                 } else {
                     warn!(
-                        "[clicky][hooks] fail command={} code={:?} message={}",
-                        result.command, result.code, result.message
+                        "[clicky][hooks] queue-fail command={} message={}",
+                        result.command, result.message
                     );
                 }
             }
@@ -93,6 +90,7 @@ pub fn persist_idea_env_snapshot(items: &[(String, String)]) -> Result<Option<St
     Ok(Some(path.display().to_string()))
 }
 
+#[cfg(test)]
 /// Runs post-apply hooks in a shell appropriate for the host OS.
 pub fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
     let mut results = Vec::new();
@@ -136,6 +134,64 @@ pub fn run_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
         }
     }
     results
+}
+
+/// Starts post-apply hooks without waiting so shell wrappers do not flash or steal focus.
+fn spawn_post_hooks(hooks: Option<&HooksDef>) -> Vec<HookResult> {
+    let mut results = Vec::new();
+    let Some(post_hooks) = hooks.and_then(|h| h.post.as_ref()) else {
+        return results;
+    };
+
+    for cmd in post_hooks {
+        let output = spawn_post_hook_command(cmd);
+        match output {
+            Ok(()) => results.push(HookResult {
+                command: cmd.clone(),
+                success: true,
+                code: None,
+                message: "queued".to_string(),
+            }),
+            Err(e) => results.push(HookResult {
+                command: cmd.clone(),
+                success: false,
+                code: None,
+                message: e,
+            }),
+        }
+    }
+
+    results
+}
+
+fn spawn_post_hook_command(cmd: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        Command::new("cmd")
+            .args(["/C", cmd])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("spawn hook failed: {}", e))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("sh")
+            .args(["-c", cmd])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("spawn hook failed: {}", e))
+    }
 }
 
 fn idea_env_file_path() -> Result<PathBuf, String> {

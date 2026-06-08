@@ -160,7 +160,7 @@ pub fn run() {
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                let _ = window.hide();
+                service::tray_service::hide_main_window(window.app_handle());
             }
         })
         .invoke_handler(tauri::generate_handler![

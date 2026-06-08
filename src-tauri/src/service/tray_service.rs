@@ -83,6 +83,15 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// Hides the main window and returns the app to menu-bar-only mode on macOS.
+pub fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+}
+
 /// Sends a short notification used by tray-triggered actions.
 pub fn deliver_tray_feedback(app: &AppHandle, body: &str) {
     let _ = app
@@ -95,6 +104,9 @@ pub fn deliver_tray_feedback(app: &AppHandle, body: &str) {
 
 /// Creates the tray icon and wires the menu click handlers.
 pub fn setup_tray(app: &mut tauri::App) -> Result<(), tauri::Error> {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
     let state = app.state::<AppRuntimeState>();
     let app_handle = app.handle().clone();
     let tray_menu = build_tray_menu(&app_handle, &state)?;
